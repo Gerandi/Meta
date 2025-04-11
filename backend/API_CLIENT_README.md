@@ -1,39 +1,29 @@
-# Standardized API Client Implementation
+# Academic Paper API Implementation
 
-This document outlines the standardized API client for the Meta Research Review project and how it integrates with various academic paper APIs.
+This document outlines the API implementation for the Meta Research Review project and how it retrieves academic paper data.
 
 ## Overview
 
-The API client provides a consistent interface for retrieving academic paper data from multiple providers, including:
+The system now exclusively uses the OpenAlex API as the primary data source for academic papers, with Unpaywall as a fallback for obtaining PDF URLs and open access information.
 
-- Crossref
-- Semantic Scholar
-- Scopus
-- Exa.ai
-- Unpaywall
-
-All responses are standardized to ensure a consistent data format across providers.
-
-## API Client Structure
+## API Structure
 
 ### Main Components
 
-- `api_client.py`: Core implementation of all provider-specific API clients
-- Integration with existing services:
-  - `additional_providers.py`: Uses standardized API client for combined search
-  - `paper_provider.py`: Uses standardized API client for Crossref search
-  - `unpaywall.py`: Uses standardized API client for Unpaywall data
+- `openalex_search.py`: Core implementation for paper search using OpenAlex API
+- `doi_service.py`: Retrieves detailed paper information by DOI
+- `pdf_service.py`: Obtains PDF URLs using Unpaywall when needed
+- `api_client.py`: Simplified implementation with only Unpaywall functionality
 
 ### Configuration
 
 API keys are configured in:
-1. `.env` file - contains all API keys
+1. `.env` file - contains OpenAlex email and Unpaywall email
 2. `config.py` - reads keys from environment variables
-3. `api_client.py` - uses settings from config
 
 ## Standardized Data Format
 
-All API clients return data in a standardized format with the following common fields:
+The OpenAlex search service returns data in a standardized format with the following common fields:
 
 ```json
 {
@@ -57,26 +47,21 @@ All API clients return data in a standardized format with the following common f
   "references_count": 45,
   "is_open_access": true,
   "open_access_url": "URL to open access version",
-  "source": "Provider name"
+  "source": "OpenAlex"
 }
 ```
 
 ## Testing
 
-To test the API client implementation:
+To test the OpenAlex search implementation:
 
-1. Run the test script:
+1. Run the search test script:
    ```
-   run_test.bat
-   ```
-
-2. View the implementation summary:
-   ```
-   show_summary.bat
+   run_search_test.bat
    ```
 
 ## Next Steps
 
-1. Implement the paper processing component in the frontend
-2. Connect the frontend to the backend API endpoints
+1. Further optimize OpenAlex API usage for efficiency
+2. Enhance PDF retrieval capabilities
 3. Add more detailed error handling and user feedback in the UI
