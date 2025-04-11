@@ -8,6 +8,7 @@
         @select-paper="handleSelectPaper"
         @view-collection="handleViewCollection"
         @change-view="setActiveView"
+        @process-papers="handleProcessPapers"
       />
     </div>
   </div>
@@ -18,6 +19,7 @@ import Sidebar from './components/Sidebar.vue';
 import Dashboard from './components/Dashboard.vue';
 import PaperSearch from './components/PaperSearch.vue';
 import PdfViewer from './components/PdfViewer.vue';
+import PaperProcessing from './components/PaperProcessing.vue';
 import CodingSheet from './components/CodingSheet.vue';
 import ResultsTable from './components/ResultsTable.vue';
 import Collections from './components/Collections.vue';
@@ -30,6 +32,7 @@ export default {
     Dashboard,
     PaperSearch,
     PdfViewer,
+    PaperProcessing,
     CodingSheet,
     ResultsTable,
     Collections,
@@ -39,7 +42,8 @@ export default {
     return {
       activeView: 'dashboard',
       selectedPaper: null,
-      selectedCollectionId: null
+      selectedCollectionId: null,
+      selectedPapers: [] // Add selected papers array to store across navigation
     }
   },
   computed: {
@@ -51,6 +55,8 @@ export default {
           return PaperSearch;
         case 'viewer':
           return PdfViewer;
+        case 'processing':
+          return PaperProcessing;
         case 'codingSheet':
           return CodingSheet;
         case 'resultsTable':
@@ -70,6 +76,9 @@ export default {
       if (this.activeView === 'collectionDetail' && this.selectedCollectionId) {
         return { collectionId: this.selectedCollectionId };
       }
+      if (this.activeView === 'processing') {
+        return { selectedPapers: this.selectedPapers };
+      }
       return {};
     }
   },
@@ -85,6 +94,12 @@ export default {
     handleViewCollection(collectionId) {
       this.selectedCollectionId = collectionId;
       this.activeView = 'collectionDetail';
+    },
+
+    handleProcessPapers(papers) {
+      // Store the selected papers and navigate to processing page
+      this.selectedPapers = papers;
+      this.activeView = 'processing';
     }
   }
 }

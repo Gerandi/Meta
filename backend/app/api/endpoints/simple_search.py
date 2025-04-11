@@ -6,13 +6,14 @@ from typing import Optional, Dict, Any, List
 import logging
 import httpx
 
-from app.services.openalex_search import search_papers_openalex
+# Updated import to use the consolidated direct client
+from app.services.openalex_direct import search_papers_direct
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.get("/papers/search")
+@router.get("/search/papers")
 async def search_papers(
     query: str = Query(..., description="Search query"),
     limit: int = Query(100, description="Number of results to return"),
@@ -42,21 +43,25 @@ async def search_papers(
         logger.info(f"Search params: query={query}, filters: year_from={year_from}, year_to={year_to}, "
                   f"journal={journal}, author={author}, open_access_only={open_access_only}, sort={sort}")
         
-        try:              
-            results, total_count = await search_papers_openalex(
+        try:
+            # Use the consolidated direct search function
+            # Map limit/offset to page/per_page
+            per_page = limit
+            page = (offset // per_page) + 1 if per_page > 0 else 1
+            
+            results, total_count = await search_papers_direct(
                 query=query, 
-                limit=limit,
-                offset=offset,
+                page=page,
+                per_page=per_page,
                 year_from=year_from,
                 year_to=year_to,
                 journal=journal,
                 author=author,
                 open_access_only=open_access_only,
-                sort=sort,
-                fetch_all=False  # Don't fetch all to improve performance
+                sort=sort
             )
         except Exception as e:
-            logger.error(f"Error from OpenAlex search service: {str(e)}")
+            logger.error(f"Error from OpenAlex direct search service: {str(e)}")
             results = []
             total_count = 0
         
@@ -73,8 +78,8 @@ async def search_papers(
                     "openAccessOnly": open_access_only
                 },
                 "sortBy": sort,
-                "offset": offset,
-                "limit": limit
+                "page": page, # Return page/per_page used
+                "perPage": per_page
             }
         }
     except Exception as e:
@@ -83,6 +88,3 @@ async def search_papers(
         if not error_msg or error_msg == '{}':
             error_msg = f"Error processing search request: {type(e).__name__}"
         raise HTTPException(status_code=500, detail=error_msg)
-
-
-

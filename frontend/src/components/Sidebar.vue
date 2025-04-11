@@ -15,6 +15,12 @@
         @click="changeView('search')" 
       />
       <SidebarItem 
+        icon="tasks" 
+        text="Process Papers" 
+        :active="activeView === 'processing'" 
+        @click="changeView('processing')" 
+      />
+      <SidebarItem 
         icon="file-alt" 
         text="PDF Viewer" 
         :active="activeView === 'viewer'" 

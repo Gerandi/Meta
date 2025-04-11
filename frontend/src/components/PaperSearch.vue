@@ -304,10 +304,17 @@
           <div class="font-medium">{{ totalResults }} Results</div>
           <button 
             v-if="selectedPapers.length > 0"
-            class="ml-4 px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+            class="ml-4 px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 mr-2"
             @click="addSelectedToCollection"
           >
             Add {{ selectedPapers.length }} Selected Papers to Collection
+          </button>
+          <button 
+            v-if="selectedPapers.length > 0"
+            class="ml-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
+            @click="processSelectedPapers"
+          >
+            Process {{ selectedPapers.length }} Selected Papers
           </button>
         </div>
         <div class="flex items-center text-sm">
@@ -439,11 +446,6 @@ export default {
       itemsPerPage: APP_CONFIG.ITEMS_PER_PAGE,
       showCollectionModal: false,
       selectedPaperForCollection: null,
-      
-      // Caching for local pagination
-      cachedResults: null,
-      cachedTotalResults: 0,
-      cachedMetadata: null,
       
       // CSV Upload Modal
       showCsvUploadModal: false,
@@ -657,41 +659,36 @@ export default {
         }
         
         const data = await response.json();
-        // Store all results in cached results for local pagination
-        this.cachedResults = data.results || [];
-        this.cachedTotalResults = data.totalResults || 0;
-        this.cachedMetadata = data.metadata;
-          
-        // Process results to have uniform appearance
-        if (this.cachedResults.length > 0) {
-          this.cachedResults = this.processResultsForUniformAppearance(this.cachedResults);
-          this.cachedTotalResults = data.totalResults || this.cachedResults.length;
-          
-          // Handle pagination locally
-          const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-          const endIndex = startIndex + this.itemsPerPage;
-          this.results = this.cachedResults.slice(startIndex, endIndex);
-          this.totalResults = this.cachedTotalResults;
-          this.totalPages = Math.ceil(this.totalResults / this.itemsPerPage);
-        } else {
-          // No results
-          this.results = [];
-          this.totalResults = 0;
-          this.totalPages = 1;
-          
-          if (this.searchQuery.trim() !== '') {
-            this.error = `No results found for "${this.searchQuery}". Try different search terms or remove some filters.`;
-          }
+        
+        // Use results directly from backend
+        this.results = data.results || [];
+        this.totalResults = data.totalResults || 0;
+        
+        // Calculate total pages based on backend total and itemsPerPage
+        this.totalPages = Math.ceil(this.totalResults / this.itemsPerPage);
+        
+        // Ensure currentPage is not out of bounds after search
+        if (this.currentPage > this.totalPages && this.totalPages > 0) {
+          this.currentPage = this.totalPages;
+          // Optionally re-fetch if page was adjusted, though usually not necessary
+          // await this.searchPapers(); // Re-fetch might cause loop if API behaves unexpectedly
+        } else if (this.totalPages === 0) {
+          this.currentPage = 1; // Reset to page 1 if no results
+        }
+
+        if (this.results.length === 0 && this.searchQuery.trim() !== '') {
+           this.error = `No results found for "${this.searchQuery}". Try different search terms or remove some filters.`;
         }
         
         // Reset selection
         this.selectedPapers = [];
         this.allSelected = false;
         
-        // Store search metadata if available
-        if (this.cachedMetadata) {
-          console.log('Search metadata:', this.cachedMetadata);
+        // Log metadata if available
+        if (data.metadata) {
+          console.log('Search metadata:', data.metadata);
         }
+        
       } catch (err) {
         let errorMessage = 'Failed to search papers';
         
@@ -765,13 +762,10 @@ export default {
         providers: ['openalex']
       };
       
-      // Clear cached results when filters are reset
-      this.cachedResults = null;
-      this.cachedTotalResults = 0;
-      this.cachedMetadata = null;
       
       // Reset pagination
       this.currentPage = 1;
+      this.totalPages = 1; // Reset total pages as well
       
       // If there was a search query, perform a new search with cleared filters
       if (this.searchQuery.trim()) {
@@ -791,26 +785,8 @@ export default {
         this.currentPage++;
         this.searchPapers();
       }
-    },
-    
-    updateLocalPagination() {
-      if (this.cachedResults && this.cachedResults.length > 0) {
-        const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-        const endIndex = startIndex + this.itemsPerPage;
-        this.results = this.cachedResults.slice(startIndex, endIndex);
-        
-        // Reset selection when changing pages
-        this.selectedPapers = [];
-        this.allSelected = false;
-        
-        // Scroll to top of results
-        window.scrollTo({
-          top: document.querySelector('.bg-white.rounded-lg.shadow').offsetTop - 20,
-          behavior: 'smooth'
-        });
-      }
-    },
-    
+    }, // Added comma
+
     viewPaper(paper) {
       // Navigate to PDF viewer with the selected paper
       this.$emit('select-paper', paper);
@@ -822,6 +798,14 @@ export default {
         // Always fetch the PDF URL from the backend when requested
         // This ensures we're not using stale data and only fetch when needed
         if (paper.doi) {
+          // Use the open_access_url directly if available (now provided by backend)
+          if (paper.open_access_url) {
+             window.open(paper.open_access_url, '_blank');
+             this.isLoading = false;
+             return;
+          }
+          
+          // Fallback: If no direct OA URL, try fetching via DOI endpoint
           const response = await fetch(`${API_ROUTES.PAPERS.GET_PDF}/${encodeURIComponent(paper.doi)}`);
           if (response.ok) {
             const data = await response.json();
@@ -831,21 +815,10 @@ export default {
               return;
             }
           }
-          // If backend request failed but we have a cached URL, try that
-          if (paper.open_access_url) {
-            window.open(paper.open_access_url, '_blank');
-            this.isLoading = false;
-            return;
-          }
           
           throw new Error('Could not retrieve PDF URL');
-        } else if (paper.open_access_url) {
-          // If we somehow already have a URL but no DOI
-          window.open(paper.open_access_url, '_blank');
-          this.isLoading = false;
-          return;
         } else {
-          throw new Error('No DOI or PDF URL available');
+           throw new Error('No DOI available to fetch PDF');
         }
       } catch (err) {
         console.error('Error fetching PDF URL:', err);
@@ -876,37 +849,17 @@ export default {
       }
     },
     
+    processSelectedPapers() {
+      if (this.selectedPapers.length === 0) return;
+      
+      // Emit event to pass selected papers to App.vue
+      this.$emit('process-papers', this.selectedPapers);
+    },
+    
     viewDetails(paper) {
       // View paper details (implement later)
       console.log('View details:', paper);
-    },
-    
-    processResultsForUniformAppearance(results) {
-      // Process each result to have uniform appearance
-      const ABSTRACT_LENGTH = 300; // Max length for abstracts
-      
-      return results.map(paper => {
-        // Truncate abstract to consistent length
-        let abstract = paper.abstract || 'No abstract available';
-        if (abstract.length > ABSTRACT_LENGTH) {
-          abstract = abstract.substring(0, ABSTRACT_LENGTH) + '...';
-        }
-        
-        // Ensure all papers have same structure
-        return {
-          ...paper,
-          abstract: abstract,
-          // Ensure other fields exist
-          authors: paper.authors || [],
-          journal: paper.journal || 'Unknown Journal',
-          publication_date: paper.publication_date || 'Unknown Date',
-          doi: paper.doi || null,
-          url: paper.url || null,
-          citation_count: paper.citation_count || 0,
-          source: paper.source || 'Unknown Source'
-        };
-      });
-    }
+    } // Removed final comma as it's the last method
   }
 }
 </script>

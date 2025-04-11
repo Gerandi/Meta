@@ -5,7 +5,8 @@ import asyncio
 from typing import Optional, Dict, Any, List
 
 from app.core.config import settings
-from app.services.openalex_search import search_papers_openalex
+# Updated import to use the consolidated direct client
+from app.services.openalex_direct import search_papers_direct 
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +25,14 @@ async def get_doi_for_paper(title: str, author: str, year: str) -> Optional[str]
         author = clean_author(author)
     
     try:
-        # Use the centralized search function instead of direct API calls
-        # The search function will handle proper OpenAlex API formatting and error handling
-        results, total_count = await search_papers_openalex(
+        # Use the consolidated direct search function
+        results, total_count = await search_papers_direct(
             query=title,
-            limit=3,  # Get top 3 results to find the best match
-            year_from=year,
-            year_to=year,
+            per_page=3, # Use per_page instead of limit
+            page=1,     # Start from page 1
+            year_from=int(year) if year else None, # Ensure year is int
+            year_to=int(year) if year else None,   # Ensure year is int
+            # Removed duplicate year_to=year,
             author=author,
             sort="relevance"
         )

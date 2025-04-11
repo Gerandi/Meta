@@ -7,7 +7,8 @@ import sys
 
 sys.path.append('.')
 
-from app.services.openalex_search import search_papers_openalex
+# Updated import to use the consolidated direct client
+from app.services.openalex_direct import search_papers_direct 
 
 
 async def test_search():
@@ -15,9 +16,11 @@ async def test_search():
     query = "export performance"
     print(f"Searching for: {query} using OpenAlex")
     
-    results, total = await search_papers_openalex(
+    # Use the consolidated direct search function
+    results, total = await search_papers_direct(
         query=query,
-        limit=5
+        per_page=5, # Use per_page
+        page=1      # Specify page
     )
     
     print(f"Found {total} total results. Showing first {len(results)} results:\n")

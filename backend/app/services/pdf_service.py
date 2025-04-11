@@ -3,7 +3,8 @@ import logging
 from typing import Optional, Dict, Any
 
 from app.core.config import settings
-from app.services.openalex_search import get_paper_by_doi_openalex
+# Updated import to use the consolidated direct client
+from app.services.openalex_direct import get_paper_by_doi_direct 
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +18,16 @@ async def get_paper_pdf_url(doi: str) -> Optional[str]:
     Returns:
         URL to the PDF if available, None otherwise
     """
-    # First try OpenAlex using the centralized function
-    paper_data = await get_paper_by_doi_openalex(doi)
+    # First try OpenAlex using the consolidated direct function
+    paper_data = await get_paper_by_doi_direct(doi)
     
     if paper_data:
-        # Extract open access URL from OpenAlex data
-        if paper_data.get("open_access") and paper_data["open_access"].get("is_oa"):
-            oa_url = paper_data["open_access"].get("oa_url")
-            if oa_url:
-                logger.info(f"PDF URL found in OpenAlex for DOI {doi}")
-                return oa_url
+        # Extract open access URL from the formatted OpenAlex data
+        # The direct function now returns 'open_access_url' directly
+        oa_url = paper_data.get("open_access_url")
+        if oa_url:
+            logger.info(f"PDF URL found in OpenAlex for DOI {doi}")
+            return oa_url
 
     # Fallback to Unpaywall if OpenAlex didn't have the PDF URL
     logger.info(f"OpenAlex didn't have PDF URL for DOI {doi}, falling back to Unpaywall")
@@ -45,36 +46,24 @@ async def get_paper_details(doi: str) -> Dict[str, Any]:
     Returns:
         Dictionary with paper details
     """
-    paper_info = {
-        "is_oa": False,
-        "pdf_url": None,
-        "url": None,
-        "oa_status": None,
-        "journal_is_oa": False
-    }
-    
-    # First try OpenAlex using the centralized function
-    paper_data = await get_paper_by_doi_openalex(doi)
+    # First try OpenAlex using the consolidated direct function
+    paper_data = await get_paper_by_doi_direct(doi)
     
     if paper_data:
-        # Extract data from OpenAlex
-        paper_info["is_oa"] = paper_data.get("open_access", {}).get("is_oa", False)
-        if paper_info["is_oa"]:
-            paper_info["pdf_url"] = paper_data.get("open_access", {}).get("oa_url")
-        
-        # Get URL
-        paper_info["url"] = paper_data.get("doi") or paper_data.get("primary_location", {}).get("landing_page_url")
-        
-        # Get OA status
-        paper_info["oa_status"] = "open" if paper_info["is_oa"] else "closed"
-        
-        # Get journal info
-        if paper_data.get("primary_location") and paper_data["primary_location"].get("source"):
-            paper_info["journal_is_oa"] = paper_data["primary_location"]["source"].get("is_oa", False)
-            paper_info["journal_issns"] = paper_data["primary_location"]["source"].get("issn", [])
-        
+        # Use the formatted data directly from get_paper_by_doi_direct
         logger.info(f"Found paper details in OpenAlex for DOI {doi}")
-        return paper_info
+        # Return a subset relevant to this function's purpose if needed, 
+        # or the full formatted data. Let's return relevant fields.
+        return {
+            "is_oa": paper_data.get("is_open_access", False),
+            "pdf_url": paper_data.get("open_access_url"),
+            "url": paper_data.get("url"),
+            "oa_status": "open" if paper_data.get("is_open_access") else "closed",
+            # Journal OA status might need re-evaluation based on available fields in formatted_paper
+            # For now, let's assume it's not directly available in the simplified format
+            "journal_is_oa": None, 
+            "journal_issns": None # Also not directly in the simplified format
+        }
     
     # Fallback to Unpaywall
     logger.info(f"OpenAlex didn't have details for DOI {doi}, falling back to Unpaywall")

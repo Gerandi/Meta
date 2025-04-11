@@ -5,7 +5,7 @@ export const API_BASE_URL = 'http://localhost:8000';
 export const API_ROUTES = {
     PAPERS: {
         BASE_URL: API_BASE_URL,
-        SEARCH: `${API_BASE_URL}/papers/search`,
+        SEARCH: `${API_BASE_URL}/search/papers`,
         GET_BY_ID: (id) => `${API_BASE_URL}/papers/${id}`,
         CREATE: `${API_BASE_URL}/papers`,
         FIND_DOI: `${API_BASE_URL}/papers/find-doi`,
@@ -13,7 +13,13 @@ export const API_ROUTES = {
         GET_PDF: (doi) => `${API_BASE_URL}/papers/pdf/${doi}`,
         ADVANCED_SEARCH: `${API_BASE_URL}/papers/advanced-search`,
         TEST_SEARCH: `${API_BASE_URL}/papers/test-search`,
-        SEARCH: `${API_BASE_URL}/papers/search`,
+    },
+    PROCESSING: {
+        CLEANUP: `${API_BASE_URL}/papers/cleanup`,
+        FIND_DUPLICATES: `${API_BASE_URL}/papers/find-duplicates`,
+        UPDATE_METADATA: (id) => `${API_BASE_URL}/papers/${id}/update-metadata`,
+        RETRIEVE_PDF: (id) => `${API_BASE_URL}/papers/${id}/retrieve-pdf`,
+        COUNTS: `${API_BASE_URL}/papers/counts`,
     },
     COLLECTIONS: {
         LIST: `${API_BASE_URL}/collections`,

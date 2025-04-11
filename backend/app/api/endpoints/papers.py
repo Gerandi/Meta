@@ -10,91 +10,20 @@ from io import StringIO
 
 logger = logging.getLogger(__name__)
 
-from app.schemas.paper import Paper, PaperCreate, PaperSearch
+from app.schemas.paper import Paper, PaperCreate # Removed PaperSearch as the endpoint is removed
 # Remove paper_provider import and directly import from service modules
 from app.services.paper import create_paper, get_paper_by_id, update_paper, delete_paper, list_papers
 from app.services.pdf_service import get_paper_pdf_url, get_paper_details
 from app.services.doi_service import get_doi_for_paper, get_dois_for_papers
-from app.services.openalex_search import search_papers_openalex
+# Removed import for openalex_search as it's being deprecated
+from app.services.openalex_direct import search_papers_direct # Import the consolidated function
 from app.db.session import get_db
 
 router = APIRouter()
 
+# Removed the redundant /search endpoint previously defined here
+# The main search endpoint is now in app/api/endpoints/search.py
 
-
-@router.get("/search")
-async def search_papers(
-    query: str = Query(..., description="Search query"),
-    limit: int = Query(100, description="Number of results to return"),
-    offset: int = Query(0, description="Number of results to skip"),
-    year_from: Optional[int] = Query(None, description="Filter from year"),
-    year_to: Optional[int] = Query(None, description="Filter to year"),
-    journal: Optional[str] = Query(None, description="Filter by journal name"),
-    author: Optional[str] = Query(None, description="Filter by author name (will search by ID when possible)"),
-    open_access_only: bool = Query(False, description="Filter to open access only"),
-    sort_by: str = Query("relevance", description="Sort results by (relevance, date, cited, title)"),
-    db: Session = Depends(get_db),
-):
-    """
-    Search for papers using OpenAlex API.
-    
-    Returns papers matching the query with filtering and pagination options.
-    All data comes from OpenAlex, ensuring high-quality, consistent results.
-    
-    - For author filtering, the system first attempts to find the author ID for more precise results
-    - Journal filtering searches by journal name
-    - Results include metadata such as title, authors, publication details, and open access availability
-    """
-    try:
-        # Log the received parameters for debugging
-        logger.info(f"Search parameters: query={query}, limit={limit}, offset={offset}, year_from={year_from}, "
-                  f"year_to={year_to}, journal={journal}, author={author}, open_access_only={open_access_only}, "
-                  f"sort_by={sort_by}")
-
-        # Use OpenAlex search
-        results, total_count = await search_papers_openalex(
-            query=query, 
-            limit=limit,
-            offset=offset,
-            year_from=year_from,
-            year_to=year_to,
-            journal=journal,
-            author=author,
-            open_access_only=open_access_only,
-            sort=sort_by
-        )
-        
-        return {
-            "results": results,
-            "totalResults": total_count,
-            "metadata": {
-                "query": query,
-                "filters": {
-                    "yearFrom": year_from,
-                    "yearTo": year_to,
-                    "journal": journal,
-                    "author": author,
-                    "openAccessOnly": open_access_only,
-                    "providers": ["openalex"]
-                },
-                "sortBy": sort_by,
-                "offset": offset,
-                "limit": limit
-            }
-        }
-    
-    except httpx.HTTPError as e:
-        logger.error(f"HTTP error during paper search: {e}")
-        raise HTTPException(status_code=502, detail=f"Error connecting to external API: {str(e)}")
-    except httpx.TimeoutException as e:
-        logger.error(f"Timeout during paper search: {e}")
-        raise HTTPException(status_code=504, detail="External API request timed out")
-    except Exception as e:
-        logger.error(f"Error in search: {str(e)}")
-        error_msg = str(e)
-        if isinstance(e, object) and not error_msg:
-            error_msg = f"Error of type {type(e).__name__}"
-        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.post("/", response_model=Paper, status_code=status.HTTP_201_CREATED)
@@ -222,12 +151,14 @@ async def find_paper_doi(
         # Use OpenAlex search directly for more control
         logger.info(f"Finding DOI for: '{title}' by {author} ({year})")
         
-        # Use the search_papers_openalex function with specific filters
-        results, count = await search_papers_openalex(
+        # Use the consolidated direct search function
+        results, count = await search_papers_direct(
             query=title,
-            limit=3,  # Get top 3 results to improve matching chances
-            year_from=year,
-            year_to=year,
+            per_page=3,  # Get top 3 results to improve matching chances
+            page=1,
+            year_from=int(year) if year else None, # Ensure year is int
+            year_to=int(year) if year else None,   # Ensure year is int
+            # Removed duplicate year_to=year,
             author=author,
             sort="relevance"
         )
