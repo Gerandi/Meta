@@ -5,12 +5,13 @@ import httpx
 import json
 import csv
 import logging
+import asyncio
 from io import StringIO
 
 logger = logging.getLogger(__name__)
 
 from app.schemas.paper import Paper, PaperCreate, PaperSearch
-from app.services.paper_provider import get_paper_access, get_doi_for_paper, get_dois_for_papers, get_paper_pdf_url, process_csv_for_dois, process_csv_for_pdfs
+# Remove paper_provider import and directly import from service modules
 from app.services.paper import create_paper, get_paper_by_id, update_paper, delete_paper, list_papers
 from app.services.pdf_service import get_paper_pdf_url, get_paper_details
 from app.services.doi_service import get_doi_for_paper, get_dois_for_papers
@@ -307,11 +308,38 @@ async def batch_find_dois(
         content = await file.read()
         text_content = content.decode("utf-8-sig")
         
-        # Process the CSV for DOIs
-        results = await process_csv_for_dois(text_content)
+        # Process CSV content into paper dictionaries
+        import csv
+        from io import StringIO
+        
+        reader = csv.DictReader(StringIO(text_content))
+        papers = list(reader)
+        
+        # Check if required fields exist
+        required_columns = ['title', 'authors', 'year']
+        for paper in papers:
+            if not all(key in paper for key in required_columns):
+                logger.error(f"CSV must contain 'title', 'authors', and 'year' columns")
+                raise ValueError("CSV must contain 'title', 'authors', and 'year' columns")
+        
+        # Find DOIs for the papers
+        results = await get_dois_for_papers(papers)
         
         # Add PDF URLs to papers with DOIs
-        results_with_pdf = await process_csv_for_pdfs(results)
+        results_with_pdf = []
+        
+        for paper in results:
+            doi = paper.get('doi')
+            if doi and doi != "Not found":
+                pdf_url = await get_paper_pdf_url(doi)
+                paper['pdf_url'] = pdf_url if pdf_url else "Not found"
+            else:
+                paper['pdf_url'] = "No DOI"
+            
+            results_with_pdf.append(paper)
+            
+            # Add a small delay to avoid rate limiting
+            await asyncio.sleep(0.5)
         
         return results_with_pdf
     

@@ -243,12 +243,22 @@ async def search_papers_openalex(
                                     if isinstance(concept, dict) and concept.get("display_name"):
                                         keywords.append(concept.get("display_name"))
                             
+                            # Parse publication date
+                            publication_date_obj = None
+                            pub_date_str = paper.get("publication_date")
+                            if pub_date_str:
+                                try:
+                                    # OpenAlex uses YYYY-MM-DD format
+                                    publication_date_obj = datetime.strptime(pub_date_str, '%Y-%m-%d')
+                                except ValueError:
+                                    logger.warning(f"Could not parse publication date: {pub_date_str}")
+                            
                             # Format the paper
                             formatted_paper = {
                                 "title": paper.get("title", ""),
                                 "doi": paper.get("doi", None),
                                 "authors": authors,
-                                "publication_date": paper.get("publication_date", None),
+                                "publication_date": publication_date_obj,  # Now using datetime object
                                 "abstract": abstract,
                                 "journal": journal_name,
                                 "volume": paper.get("biblio", {}).get("volume", None),
@@ -305,3 +315,62 @@ async def search_papers_openalex(
     except Exception as e:
         logger.error(f"Error searching OpenAlex: {str(e)}")
         return [], 0
+
+async def get_paper_by_doi_openalex(doi: str) -> Optional[Dict[str, Any]]:
+    """
+    Get paper details from OpenAlex using DOI
+    
+    Args:
+        doi: The DOI of the paper
+        
+    Returns:
+        Paper details if available, None otherwise
+    """
+    try:
+        # OpenAlex uses DOIs with "https://doi.org/" prefix
+        formatted_doi = doi
+        if not formatted_doi.startswith("https://doi.org/"):
+            formatted_doi = f"https://doi.org/{doi}"
+        
+        url = f"https://api.openalex.org/works/{formatted_doi}"
+        params = {"mailto": EMAIL}
+        
+        # Make the request with retry logic
+        max_retries = 3
+        retry_delay = 2  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.get(url, params=params)
+                    
+                    if response.status_code == 200:
+                        return response.json()
+                    elif response.status_code == 429:
+                        # Rate limited - wait and retry
+                        logger.warning(f"OpenAlex API rate limit hit (attempt {attempt+1}/{max_retries}). Waiting {retry_delay}s before retry.")
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                    elif response.status_code == 404:
+                        logger.warning(f"Paper with DOI {doi} not found in OpenAlex")
+                        return None
+                    else:
+                        logger.warning(f"OpenAlex API error for DOI {doi}: HTTP {response.status_code}")
+                        if attempt == max_retries - 1:
+                            return None
+                        await asyncio.sleep(retry_delay)
+            
+            except httpx.ReadTimeout:
+                logger.warning(f"OpenAlex API timeout (attempt {attempt+1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                else:
+                    logger.error("OpenAlex API timeout - max retries reached")
+                    return None
+        
+        return None
+    
+    except Exception as e:
+        logger.error(f"Error retrieving paper details from OpenAlex for DOI {doi}: {str(e)}")
+        return None

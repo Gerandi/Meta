@@ -3,40 +3,9 @@ import logging
 from typing import Optional, Dict, Any
 
 from app.core.config import settings
+from app.services.openalex_search import get_paper_by_doi_openalex
 
 logger = logging.getLogger(__name__)
-
-async def get_paper_by_doi_openalex(doi: str) -> Optional[Dict[str, Any]]:
-    """
-    Get paper details from OpenAlex using DOI
-    
-    Args:
-        doi: The DOI of the paper
-        
-    Returns:
-        Paper details if available, None otherwise
-    """
-    try:
-        # OpenAlex uses DOIs with "https://doi.org/" prefix
-        formatted_doi = doi
-        if not formatted_doi.startswith("https://doi.org/"):
-            formatted_doi = f"https://doi.org/{doi}"
-        
-        url = f"https://api.openalex.org/works/{formatted_doi}"
-        params = {"mailto": settings.OPENALEX_EMAIL}
-        
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(url, params=params)
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                logger.warning(f"OpenAlex API error for DOI {doi}: HTTP {response.status_code}")
-                return None
-    
-    except Exception as e:
-        logger.error(f"Error retrieving paper details from OpenAlex for DOI {doi}: {str(e)}")
-        return None
 
 async def get_paper_pdf_url(doi: str) -> Optional[str]:
     """
@@ -48,7 +17,7 @@ async def get_paper_pdf_url(doi: str) -> Optional[str]:
     Returns:
         URL to the PDF if available, None otherwise
     """
-    # First try OpenAlex
+    # First try OpenAlex using the centralized function
     paper_data = await get_paper_by_doi_openalex(doi)
     
     if paper_data:
@@ -84,7 +53,7 @@ async def get_paper_details(doi: str) -> Dict[str, Any]:
         "journal_is_oa": False
     }
     
-    # First try OpenAlex
+    # First try OpenAlex using the centralized function
     paper_data = await get_paper_by_doi_openalex(doi)
     
     if paper_data:

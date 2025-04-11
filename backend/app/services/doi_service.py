@@ -5,6 +5,7 @@ import asyncio
 from typing import Optional, Dict, Any, List
 
 from app.core.config import settings
+from app.services.openalex_search import search_papers_openalex
 
 logger = logging.getLogger(__name__)
 
@@ -22,77 +23,66 @@ async def get_doi_for_paper(title: str, author: str, year: str) -> Optional[str]
     if len(author.split()) > 1:
         author = clean_author(author)
     
-    url = "https://api.openalex.org/works"
-    
-    # Improved parameter handling with better search focus
-    params = {
-        "search": title,
-        "filter": f"publication_year:{year}",
-        "per_page": 3,  # Get top 3 results to find the best match
-        "mailto": settings.OPENALEX_EMAIL
-    }
-    
-    # Add author filter if available
-    if author:
-        params["filter"] += f",author.display_name.search:{author}"
-    
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:  # Extended timeout
-            response = await client.get(url, params=params)
+        # Use the centralized search function instead of direct API calls
+        # The search function will handle proper OpenAlex API formatting and error handling
+        results, total_count = await search_papers_openalex(
+            query=title,
+            limit=3,  # Get top 3 results to find the best match
+            year_from=year,
+            year_to=year,
+            author=author,
+            sort="relevance"
+        )
+        
+        if results and total_count > 0:
+            # Enhanced matching - prioritize papers with exact title match
+            best_match = None
+            best_match_score = 0
             
-            if response.status_code == 200:
-                data = response.json()
+            for paper in results:
+                # Skip items without DOIs
+                if not paper.get('doi'):
+                    continue
+                    
+                # Basic score starts at 1
+                score = 1
                 
-                if data.get('meta', {}).get('count', 0) > 0:
-                    items = data['results']
+                # Give higher score for title similarity
+                paper_title = paper.get('title', '').lower()
+                search_title = title.lower()
+                if paper_title == search_title:
+                    score += 3  # Exact match
+                elif search_title in paper_title or paper_title in search_title:
+                    score += 2  # Partial match
                     
-                    # Enhanced matching - prioritize papers with exact title match
-                    best_match = None
-                    best_match_score = 0
-                    
-                    for item in items:
-                        # Skip items without DOIs
-                        if not item.get('doi'):
-                            continue
-                            
-                        # Basic score starts at 1
-                        score = 1
+                # Give bonus points for matching author
+                if author:
+                    has_author = False
+                    for paper_author in paper.get('authors', []):
+                        author_name = paper_author.get('name', '').lower()
+                        if author.lower() in author_name or author_name in author.lower():
+                            has_author = True
+                            break
+                    if has_author:
+                        score += 1
                         
-                        # Give higher score for title similarity
-                        item_title = item.get('title', '').lower()
-                        search_title = title.lower()
-                        if item_title == search_title:
-                            score += 3  # Exact match
-                        elif search_title in item_title or item_title in search_title:
-                            score += 2  # Partial match
-                            
-                        # Give bonus points for matching author
-                        if author:
-                            has_author = False
-                            for authorship in item.get('authorships', []):
-                                author_name = authorship.get('author', {}).get('display_name', '').lower()
-                                if author.lower() in author_name or author_name in author.lower():
-                                    has_author = True
-                                    break
-                            if has_author:
-                                score += 1
-                                
-                        # Update best match if this is better
-                        if score > best_match_score:
-                            best_match = item
-                            best_match_score = score
-                    
-                    # Use the best matching paper
-                    if best_match and 'doi' in best_match:
-                        logger.info(f"Found DOI for paper: {title} with match score {best_match_score}")
-                        return best_match['doi']
-                        
-            logger.warning(f"No DOI found for: {title} by {author} ({year})")
+                # Update best match if this is better
+                if score > best_match_score:
+                    best_match = paper
+                    best_match_score = score
+            
+            # Use the best matching paper
+            if best_match and 'doi' in best_match:
+                logger.info(f"Found DOI for paper: {title} with match score {best_match_score}")
+                return best_match['doi']
+                
+        logger.warning(f"No DOI found for: {title} by {author} ({year})")
+        return None
     
     except Exception as e:
         logger.error(f"Error retrieving DOI for paper '{title}': {str(e)}")
-    
-    return None
+        return None
 
 
 async def get_dois_for_papers(papers: List[Dict[str, str]]) -> List[Dict[str, str]]:

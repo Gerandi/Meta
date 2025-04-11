@@ -1,3 +1,13 @@
+"""
+DEPRECATED: This file is maintained for backward compatibility only and will be removed
+in a future update. All functionality has been moved to direct service imports:
+- openalex_search.py: For paper searching and DOI lookup
+- doi_service.py: For DOI-related functionality
+- pdf_service.py: For PDF and open access functionality
+
+DO NOT ADD NEW FUNCTIONALITY TO THIS FILE.
+"""
+
 import requests
 import time
 import json
