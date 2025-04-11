@@ -1,0 +1,9 @@
+@echo off
+echo Installing dependencies...
+pip install -r requirements.txt
+
+echo Initializing database...
+python setup_db.py
+
+echo Starting server...
+uvicorn main:app --reload

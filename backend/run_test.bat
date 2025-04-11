@@ -1,0 +1,3 @@
+@echo off
+echo Running API client test...
+python test_api_client.py
