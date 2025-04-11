@@ -1,12 +1,10 @@
-# This file should be renamed to search.py for better clarity
-
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional, Dict, Any, List
 
 import logging
 import httpx
 
-from app.services.openalex_search import search_papers_openalex
+from app.services.openalex_direct import search_papers_direct
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +13,8 @@ router = APIRouter()
 @router.get("/papers/search")
 async def search_papers(
     query: str = Query(..., description="Search query"),
-    limit: int = Query(100, description="Number of results to return"),
-    offset: int = Query(0, description="Number of results to skip"),
+    page: int = Query(1, description="Page number"),
+    per_page: int = Query(10, description="Results per page"),
     year_from: Optional[int] = Query(None, description="Filter from year"),
     year_to: Optional[int] = Query(None, description="Filter to year"),
     journal: Optional[str] = Query(None, description="Filter by journal name"),
@@ -39,26 +37,21 @@ async def search_papers(
                     "message": "Please provide a search term"
                 }
             }
-        logger.info(f"Search params: query={query}, filters: year_from={year_from}, year_to={year_to}, "
-                  f"journal={journal}, author={author}, open_access_only={open_access_only}, sort={sort}")
+            
+        logger.info(f"Search params: query={query}, page={page}, per_page={per_page}")
         
-        try:              
-            results, total_count = await search_papers_openalex(
-                query=query, 
-                limit=limit,
-                offset=offset,
-                year_from=year_from,
-                year_to=year_to,
-                journal=journal,
-                author=author,
-                open_access_only=open_access_only,
-                sort=sort,
-                fetch_all=False  # Don't fetch all to improve performance
-            )
-        except Exception as e:
-            logger.error(f"Error from OpenAlex search service: {str(e)}")
-            results = []
-            total_count = 0
+        # Call the simplified direct search function
+        results, total_count = await search_papers_direct(
+            query=query,
+            page=page,
+            per_page=per_page,
+            year_from=year_from,
+            year_to=year_to,
+            journal=journal,
+            author=author,
+            open_access_only=open_access_only,
+            sort=sort
+        )
         
         return {
             "results": results,
@@ -73,16 +66,14 @@ async def search_papers(
                     "openAccessOnly": open_access_only
                 },
                 "sortBy": sort,
-                "offset": offset,
-                "limit": limit
+                "page": page,
+                "perPage": per_page
             }
         }
+        
     except Exception as e:
         logger.error(f"Error in search: {str(e)}")
         error_msg = str(e)
         if not error_msg or error_msg == '{}':
             error_msg = f"Error processing search request: {type(e).__name__}"
         raise HTTPException(status_code=500, detail=error_msg)
-
-
-

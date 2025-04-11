@@ -89,6 +89,10 @@ async def search_papers_openalex(
     Returns:
         Tuple of (list of papers, total results count)
     """
+    # Handle empty query - return empty results
+    if not query or query.strip() == "":
+        logger.warning("Empty query provided to search_papers_openalex")
+        return [], 0
     try:
         # Base URL for OpenAlex API
         base_url = "https://api.openalex.org/works"
@@ -122,11 +126,16 @@ async def search_papers_openalex(
         
         # Build parameters
         params = {
-            "search": query,
-            "per_page": min(MAX_RESULTS_PER_PAGE, limit if not fetch_all else MAX_RESULTS_PER_PAGE),
-            "page": 1 if fetch_all else ((offset // limit) + 1 if limit else 1),
             "mailto": EMAIL
         }
+        
+        # Add search query if provided
+        if query:
+            params["search"] = query
+            
+        # Add pagination parameters
+        params["per_page"] = min(MAX_RESULTS_PER_PAGE, limit if not fetch_all else MAX_RESULTS_PER_PAGE)
+        params["page"] = 1 if fetch_all else ((offset // limit) + 1 if limit else 1)
         
         # Add filters if any
         if filters:
@@ -151,131 +160,180 @@ async def search_papers_openalex(
         for attempt in range(max_retries):
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
+                    # Log the full request for debugging
+                    logger.info(f"Making OpenAlex API request: {base_url} with params: {params}")
+                    
                     response = await client.get(base_url, params=params)
+                    
+                    # Log the response status
+                    logger.info(f"OpenAlex API response status: {response.status_code}")
+                    
+                    # Attempt to get response text for debugging
+                    try:
+                        resp_text = response.text[:500]  # Truncate to avoid huge logs
+                        logger.info(f"OpenAlex API response preview: {resp_text}...")
+                    except Exception as e:
+                        logger.error(f"Couldn't read response text: {e}")
                     
                     if response.status_code == 200:
                         # Successful response
-                        data = response.json()
-                        results = data.get('results', [])
-                        total_count = data.get('meta', {}).get('count', 0)
-                        
-                        # If fetching all results for client-side pagination, fetch additional pages
-                        if fetch_all and total_count > 0:
-                            # Calculate how many pages to fetch (up to the max results limit)
-                            pages_to_fetch = min(MAX_TOTAL_RESULTS // MAX_RESULTS_PER_PAGE,
-                                                (total_count + MAX_RESULTS_PER_PAGE - 1) // MAX_RESULTS_PER_PAGE)
+                        try:
+                            data = response.json()
                             
-                            for page in range(2, pages_to_fetch + 1):
-                                # Update page parameter
-                                params["page"] = page
+                            # Defensive coding - verify data exists
+                            if not data or not isinstance(data, dict):
+                                logger.error(f"Invalid response format from OpenAlex: {type(data)}")
+                                return [], 0
+                            
+                            # Log the full response structure for debugging
+                            logger.info(f"OpenAlex API response structure: {list(data.keys())}")
+                            
+                            # Handle case when results key doesn't exist or is empty
+                            results = data.get('results', [])
+                            if results is None:
+                                logger.error(f"No results field in OpenAlex response: {data}")
+                                results = []
                                 
-                                # Make additional request
-                                try:
-                                    page_response = await client.get(base_url, params=params)
-                                    if page_response.status_code == 200:
-                                        page_data = page_response.json()
-                                        results.extend(page_data.get('results', []))
-                                    elif page_response.status_code == 429:
-                                        logger.warning(f"Rate limited on page {page}, waiting before retry")
-                                        await asyncio.sleep(retry_delay * 2)
-                                        retry_delay *= 2  # Exponential backoff
+                            # Get total count safely
+                            meta = data.get('meta', {})
+                            if meta is None:
+                                logger.error(f"No meta field in OpenAlex response: {data}")
+                                meta = {}
+                                
+                            total_count = meta.get('count', 0)
+                            if total_count is None:
+                                total_count = 0
+                            
+                            # If fetching all results for client-side pagination, fetch additional pages
+                            if fetch_all and total_count > 0:
+                                # Calculate how many pages to fetch (up to the max results limit)
+                                pages_to_fetch = min(MAX_TOTAL_RESULTS // MAX_RESULTS_PER_PAGE,
+                                                (total_count + MAX_RESULTS_PER_PAGE - 1) // MAX_RESULTS_PER_PAGE)
+                                
+                                for page in range(2, pages_to_fetch + 1):
+                                    # Update page parameter
+                                    params["page"] = page
+                                    
+                                    # Make additional request
+                                    try:
                                         page_response = await client.get(base_url, params=params)
                                         if page_response.status_code == 200:
                                             page_data = page_response.json()
                                             results.extend(page_data.get('results', []))
+                                        elif page_response.status_code == 429:
+                                            logger.warning(f"Rate limited on page {page}, waiting before retry")
+                                            await asyncio.sleep(retry_delay * 2)
+                                            retry_delay *= 2  # Exponential backoff
+                                            page_response = await client.get(base_url, params=params)
+                                            if page_response.status_code == 200:
+                                                page_data = page_response.json()
+                                                results.extend(page_data.get('results', []))
+                                            else:
+                                                logger.warning(f"Failed to fetch page {page} after retry: {page_response.status_code}")
+                                                break
                                         else:
-                                            logger.warning(f"Failed to fetch page {page} after retry: {page_response.status_code}")
+                                            logger.warning(f"Failed to fetch page {page}: {page_response.status_code}")
                                             break
-                                    else:
-                                        logger.warning(f"Failed to fetch page {page}: {page_response.status_code}")
+                                    except Exception as e:
+                                        logger.error(f"Error fetching additional page: {e}")
                                         break
-                                except Exception as e:
-                                    logger.error(f"Error fetching additional page: {e}")
-                                    break
-                        
-                        # Format the results
-                        formatted_results = []
-                        for paper in results:
-                            # Extract authors
-                            authors = []
-                            for authorship in paper.get("authorships", []):
-                                author_info = authorship.get("author", {})
-                                name = author_info.get("display_name", "")
-                                affiliation = None
-                                if authorship.get("institutions"):
-                                    institution = authorship.get("institutions", [])[0] if authorship.get("institutions") else None
-                                    if institution:
-                                        affiliation = institution.get("display_name")
-                                authors.append({"name": name, "affiliation": affiliation})
                             
-                            # Extract abstract
-                            abstract = None
-                            if paper.get("abstract_inverted_index"):
-                                # Convert inverted index to text
+                            # Format the results
+                            formatted_results = []
+                            
+                            # Safety check - make sure results is a list
+                            if not isinstance(results, list):
+                                logger.error(f"Results is not a list: {type(results)}")
+                                return [], 0
+                                
+                            for paper in results:
+                                # Extract authors
                                 try:
-                                    words = []
-                                    for word, positions in paper["abstract_inverted_index"].items():
-                                        for pos in positions:
-                                            while len(words) <= pos:
-                                                words.append("")
-                                            words[pos] = word
-                                    abstract = " ".join(words)
+                                    authors = []
+                                    for authorship in paper.get("authorships", []):
+                                        author_info = authorship.get("author", {})
+                                        name = author_info.get("display_name", "")
+                                        affiliation = None
+                                        if authorship.get("institutions"):
+                                            institution = authorship.get("institutions", [])[0] if authorship.get("institutions") else None
+                                            if institution:
+                                                affiliation = institution.get("display_name")
+                                        authors.append({"name": name, "affiliation": affiliation})
                                 except Exception as e:
-                                    logger.error(f"Error processing abstract: {e}")
-                                    abstract = "Abstract available but could not be processed"
+                                    logger.error(f"Error processing authors: {e}")
+                                    authors = []
+                                
+                                # Extract abstract
+                                abstract = None
+                                if paper.get("abstract_inverted_index"):
+                                    # Convert inverted index to text
+                                    try:
+                                        words = []
+                                        for word, positions in paper["abstract_inverted_index"].items():
+                                            for pos in positions:
+                                                while len(words) <= pos:
+                                                    words.append("")
+                                                words[pos] = word
+                                        abstract = " ".join(words)
+                                    except Exception as e:
+                                        logger.error(f"Error processing abstract: {e}")
+                                        abstract = "Abstract available but could not be processed"
+                                
+                                # Extract journal
+                                journal_name = None
+                                if paper.get("primary_location") and paper["primary_location"].get("source"):
+                                    journal_name = paper["primary_location"]["source"].get("display_name")
+                                
+                                # Extract open access info
+                                is_oa = False
+                                oa_url = None
+                                if paper.get("open_access"):
+                                    is_oa = paper["open_access"].get("is_oa", False)
+                                    oa_url = paper["open_access"].get("oa_url")
+                                
+                                # Extract concepts as keywords
+                                keywords = []
+                                if paper.get("concepts"):
+                                    for concept in paper.get("concepts", [])[:5]:
+                                        if isinstance(concept, dict) and concept.get("display_name"):
+                                            keywords.append(concept.get("display_name"))
+                                
+                                # Parse publication date
+                                publication_date_obj = None
+                                pub_date_str = paper.get("publication_date")
+                                if pub_date_str:
+                                    try:
+                                        # OpenAlex uses YYYY-MM-DD format
+                                        publication_date_obj = datetime.strptime(pub_date_str, '%Y-%m-%d')
+                                    except ValueError:
+                                        logger.warning(f"Could not parse publication date: {pub_date_str}")
+                                
+                                # Format the paper
+                                formatted_paper = {
+                                    "title": paper.get("title", ""),
+                                    "doi": paper.get("doi", None),
+                                    "authors": authors,
+                                    "publication_date": publication_date_obj,  # Now using datetime object
+                                    "abstract": abstract,
+                                    "journal": journal_name,
+                                    "volume": paper.get("biblio", {}).get("volume", None),
+                                    "issue": paper.get("biblio", {}).get("issue", None),
+                                    "pages": f"{paper.get('biblio', {}).get('first_page', '')}-{paper.get('biblio', {}).get('last_page', '')}" if paper.get('biblio', {}).get('first_page') else None,
+                                    "publisher": paper.get("primary_location", {}).get("source", {}).get("publisher", None),
+                                    "url": paper.get("doi") or paper.get("primary_location", {}).get("landing_page_url"),
+                                    "is_open_access": is_oa,
+                                    "open_access_url": oa_url,
+                                    "citation_count": paper.get("cited_by_count", 0),
+                                    "references_count": len(paper.get("referenced_works", [])) if paper.get("referenced_works") else 0,
+                                    "keywords": keywords,
+                                    "source": "OpenAlex"
+                                }
+                                formatted_results.append(formatted_paper)
                             
-                            # Extract journal
-                            journal_name = None
-                            if paper.get("primary_location") and paper["primary_location"].get("source"):
-                                journal_name = paper["primary_location"]["source"].get("display_name")
-                            
-                            # Extract open access info
-                            is_oa = False
-                            oa_url = None
-                            if paper.get("open_access"):
-                                is_oa = paper["open_access"].get("is_oa", False)
-                                oa_url = paper["open_access"].get("oa_url")
-                            
-                            # Extract concepts as keywords
-                            keywords = []
-                            if paper.get("concepts"):
-                                for concept in paper.get("concepts", [])[:5]:
-                                    if isinstance(concept, dict) and concept.get("display_name"):
-                                        keywords.append(concept.get("display_name"))
-                            
-                            # Parse publication date
-                            publication_date_obj = None
-                            pub_date_str = paper.get("publication_date")
-                            if pub_date_str:
-                                try:
-                                    # OpenAlex uses YYYY-MM-DD format
-                                    publication_date_obj = datetime.strptime(pub_date_str, '%Y-%m-%d')
-                                except ValueError:
-                                    logger.warning(f"Could not parse publication date: {pub_date_str}")
-                            
-                            # Format the paper
-                            formatted_paper = {
-                                "title": paper.get("title", ""),
-                                "doi": paper.get("doi", None),
-                                "authors": authors,
-                                "publication_date": publication_date_obj,  # Now using datetime object
-                                "abstract": abstract,
-                                "journal": journal_name,
-                                "volume": paper.get("biblio", {}).get("volume", None),
-                                "issue": paper.get("biblio", {}).get("issue", None),
-                                "pages": f"{paper.get('biblio', {}).get('first_page', '')}-{paper.get('biblio', {}).get('last_page', '')}" if paper.get('biblio', {}).get('first_page') else None,
-                                "publisher": paper.get("primary_location", {}).get("source", {}).get("publisher", None),
-                                "url": paper.get("doi") or paper.get("primary_location", {}).get("landing_page_url"),
-                                "is_open_access": is_oa,
-                                "open_access_url": oa_url,
-                                "citation_count": paper.get("cited_by_count", 0),
-                                "references_count": len(paper.get("referenced_works", [])) if paper.get("referenced_works") else 0,
-                                "keywords": keywords,
-                                "source": "OpenAlex"
-                            }
-                            formatted_results.append(formatted_paper)
-                        
-                        return formatted_results, total_count
+                            return formatted_results, total_count
+                        except Exception as e:
+                            logger.error(f"Error processing OpenAlex response: {str(e)}")
+                            return [], 0
                     
                     elif response.status_code == 429:
                         # Rate limited - wait and retry

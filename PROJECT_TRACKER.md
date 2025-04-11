@@ -39,9 +39,10 @@
 - ✅ Improved error handling for search providers
 - ✅ Fixed relevance scoring for search results
 - ✅ Improved paper metadata extraction and formatting
+- ✅ Implemented advanced filtering of search results
+- ✅ Fixed API parameter handling to prevent unprocessable entity errors
 
 ## Current Sprint Remaining Tasks
-- Implement advanced filtering of search results
 - Add citation network visualization using OpenAlex relationships
 - Connect coding sheet to backend API
 - Implement results table data integration

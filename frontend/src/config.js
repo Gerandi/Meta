@@ -13,7 +13,7 @@ export const API_ROUTES = {
         GET_PDF: (doi) => `${API_BASE_URL}/papers/pdf/${doi}`,
         ADVANCED_SEARCH: `${API_BASE_URL}/papers/advanced-search`,
         TEST_SEARCH: `${API_BASE_URL}/papers/test-search`,
-        SIMPLE_SEARCH: `${API_BASE_URL}/papers/simple-search`,
+        SEARCH: `${API_BASE_URL}/papers/search`,
     },
     COLLECTIONS: {
         LIST: `${API_BASE_URL}/collections`,

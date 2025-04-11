@@ -1,10 +1,15 @@
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+import logging
 
 from app.api.api import api_router
 from app.core.config import settings
 from app.db.init_db import init_db
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="MetaReview API",
@@ -23,6 +28,20 @@ app.add_middleware(
 
 # Initialize database
 init_db()
+
+# Add validation error handler
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    error_details = str(exc)
+    logger.error(f"Validation error: {error_details}")
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": "Request validation error",
+            "errors": exc.errors(),
+            "message": "Check the server logs for details"
+        }
+    )
 
 # Include all API routes
 app.include_router(api_router, prefix="")

@@ -593,18 +593,25 @@ export default {
     },
     
     async searchPapers() {
-      if (!this.searchQuery.trim()) return;
+      // Clear previous error message
+      this.error = null;
       
+      // Validate search query
+      if (!this.searchQuery || !this.searchQuery.trim()) {
+        this.error = "Please enter a search term";
+        this.results = [];
+        this.totalResults = 0;
+        return;
+      }
       this.isLoading = true;
       this.error = null;
       
       try {
-        // Build query parameters for enhanced results
+        // Build query parameters for simple search
         const params = new URLSearchParams();
         params.append('query', this.searchQuery);
-        params.append('limit', "100");
-        params.append('offset', "0");
-        params.append('client_pagination', "true");
+        params.append('per_page', this.itemsPerPage.toString());
+        params.append('page', this.currentPage.toString());
         
         // Add filters if provided
         if (this.filters.yearFrom) params.append('year_from', this.filters.yearFrom.toString());
@@ -614,12 +621,15 @@ export default {
         if (this.filters.openAccessOnly) params.append('open_access_only', 'true');
         
         // Add sort parameter
-        params.append('sort_by', this.filters.sortBy);
+        params.append('sort', this.filters.sortBy);
         
-        // Use simple search endpoint
-        const endpoint = API_ROUTES.PAPERS.SIMPLE_SEARCH;
+        // Build URL with all parameters
+        const endpoint = API_ROUTES.PAPERS.SEARCH;
+        const searchUrl = `${endpoint}?${params.toString()}`;
         
-        const response = await fetch(`${endpoint}?query=${encodeURIComponent(this.searchQuery)}&limit=100`, {
+        console.log('Search URL:', searchUrl);
+        
+        const response = await fetch(searchUrl, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
@@ -630,11 +640,18 @@ export default {
           let errorDetail = 'Failed to search papers';
           try {
             const errorData = await response.json();
-            if (errorData.detail) {
-              errorDetail = errorData.detail;
+            console.error('Search API error response:', errorData);
+            
+            if (errorData && typeof errorData === 'object') {
+              if (errorData.detail) {
+                errorDetail = errorData.detail;
+              } else if (errorData.message) {
+                errorDetail = errorData.message;
+              }
             }
           } catch (e) {
             console.error('Error parsing error response:', e);
+            errorDetail = `Server error: ${response.status} ${response.statusText}`;
           }
           throw new Error(errorDetail);
         }
@@ -642,19 +659,30 @@ export default {
         const data = await response.json();
         // Store all results in cached results for local pagination
         this.cachedResults = data.results || [];
-        this.cachedTotalResults = data.totalResults || data.results.length;
+        this.cachedTotalResults = data.totalResults || 0;
         this.cachedMetadata = data.metadata;
           
         // Process results to have uniform appearance
-        this.cachedResults = this.processResultsForUniformAppearance(data.results || []);
-        this.cachedTotalResults = data.totalResults || this.cachedResults.length;
-        
-        // Handle pagination locally
-        const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-        const endIndex = startIndex + this.itemsPerPage;
-        this.results = this.cachedResults.slice(startIndex, endIndex);
-        this.totalResults = this.cachedTotalResults;
-        this.totalPages = Math.ceil(this.totalResults / this.itemsPerPage);
+        if (this.cachedResults.length > 0) {
+          this.cachedResults = this.processResultsForUniformAppearance(this.cachedResults);
+          this.cachedTotalResults = data.totalResults || this.cachedResults.length;
+          
+          // Handle pagination locally
+          const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+          const endIndex = startIndex + this.itemsPerPage;
+          this.results = this.cachedResults.slice(startIndex, endIndex);
+          this.totalResults = this.cachedTotalResults;
+          this.totalPages = Math.ceil(this.totalResults / this.itemsPerPage);
+        } else {
+          // No results
+          this.results = [];
+          this.totalResults = 0;
+          this.totalPages = 1;
+          
+          if (this.searchQuery.trim() !== '') {
+            this.error = `No results found for "${this.searchQuery}". Try different search terms or remove some filters.`;
+          }
+        }
         
         // Reset selection
         this.selectedPapers = [];
@@ -665,8 +693,16 @@ export default {
           console.log('Search metadata:', this.cachedMetadata);
         }
       } catch (err) {
-        this.error = err.message;
+        let errorMessage = 'Failed to search papers';
+        
+        if (err.message && err.message !== '[object Object]') {
+          errorMessage = err.message;
+        }
+        
         console.error('Error searching papers:', err);
+        this.error = errorMessage;
+        this.results = [];
+        this.totalResults = 0;
       } finally {
         this.isLoading = false;
       }
@@ -746,14 +782,14 @@ export default {
     prevPage() {
       if (this.currentPage > 1) {
         this.currentPage--;
-        this.updateLocalPagination();
+        this.searchPapers();
       }
     },
     
     nextPage() {
       if (this.currentPage < this.totalPages) {
         this.currentPage++;
-        this.updateLocalPagination();
+        this.searchPapers();
       }
     },
     
@@ -826,8 +862,12 @@ export default {
     
     handlePaperAdded({ papers, collectionId }) {
       const count = Array.isArray(papers) ? papers.length : 1;
-      // Show success message
-      alert(`${count} paper${count > 1 ? 's' : ''} added to collection successfully`);
+      
+      // Show success message with collection navigation option
+      if (confirm(`${count} paper${count > 1 ? 's' : ''} added to collection successfully. Would you like to view this collection?`)) {
+        // Navigate to collection detail view
+        this.$emit('view-collection', collectionId);
+      }
       
       // Clear selections if multiple papers were added
       if (count > 1) {

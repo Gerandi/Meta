@@ -21,26 +21,6 @@ from app.db.session import get_db
 router = APIRouter()
 
 
-@router.get("/test-search")
-async def test_search(query: str = Query(..., description="Search query")):
-    """
-    Simple test search endpoint.
-    """
-    try:
-        # Use OpenAlex search with minimal parameters
-        results, total_count = await search_papers_openalex(query=query, limit=5)
-        
-        return {
-            "results": results,
-            "totalResults": total_count,
-            "metadata": {
-                "query": query
-            }
-        }
-    except Exception as e:
-        logger.error(f"Error in test search: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/search")
 async def search_papers(

@@ -184,9 +184,14 @@ export default {
     async addToCollection() {
       try {
         let collectionId = this.selectedCollectionId;
+        let addedPapers = [];
         
         // If we're creating a new collection, do that first
         if (this.showCreateForm) {
+          if (!this.newCollection.name.trim()) {
+            throw new Error('Collection name is required');
+          }
+          
           const createResponse = await fetch(API_ROUTES.COLLECTIONS.CREATE, {
             method: 'POST',
             headers: {
@@ -202,6 +207,11 @@ export default {
           
           const createdCollection = await createResponse.json();
           collectionId = createdCollection.id;
+          console.log('Created new collection:', createdCollection.name, 'with ID:', collectionId);
+        }
+        
+        if (!collectionId) {
+          throw new Error('No collection selected');
         }
         
         // Process each paper
@@ -209,21 +219,38 @@ export default {
           // Skip if paper is null
           if (!paper) continue;
           
+          console.log('Adding paper to collection:', paper.title);
+          
+          // Check and prepare the paper data
+          const paperData = {
+            title: paper.title,
+            doi: paper.doi,
+            abstract: paper.abstract || '',
+            publication_date: paper.publication_date ? new Date(paper.publication_date).toISOString() : null,
+            authors: paper.authors || [],
+            journal: paper.journal || '',
+            url: paper.url || '',
+            open_access_url: paper.open_access_url || ''
+          };
+          
           // Save the paper
           const saveResponse = await fetch(API_ROUTES.PAPERS.CREATE, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify(paper)
+            body: JSON.stringify(paperData)
           });
           
           if (!saveResponse.ok) {
             const errorData = await saveResponse.json();
+            console.error('Paper data:', paperData);
+            console.error('Save response:', errorData);
             throw new Error(errorData.detail || 'Failed to save paper');
           }
           
           const savedPaper = await saveResponse.json();
+          addedPapers.push(savedPaper);
           
           // Add the paper to the collection
           const addResponse = await fetch(API_ROUTES.COLLECTIONS.ADD_PAPER(collectionId, savedPaper.id), {
@@ -241,7 +268,7 @@ export default {
         
         // Close the modal and emit success event
         this.$emit('paper-added', {
-          papers: this.papers,
+          papers: addedPapers,
           collectionId: collectionId
         });
         
