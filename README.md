@@ -4,7 +4,7 @@ MetaReview is a web application that helps researchers find papers, code them wi
 
 ## Features
 
-- **Paper Search & Import**: Search for academic papers and import them into your projects
+- **Paper Search & Import**: Search for academic papers via OpenAlex and import them into your projects
 - **PDF Viewing & Coding**: View PDFs and extract data using customizable coding sheets
 - **AI-Assisted Coding**: Use AI to help extract relevant data from papers
 - **Results Tables**: Generate tables for meta-analysis from your coded data
@@ -30,7 +30,7 @@ MetaReview is a web application that helps researchers find papers, code them wi
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/Scripts/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 pip install pydantic-settings
 uvicorn main:app --reload
@@ -46,6 +46,16 @@ npm run dev
 ```
 
 The application will be available at http://localhost:5173
+
+## API Configuration
+
+The application uses the OpenAlex API for academic paper searches. For better performance, set your email in the `.env` file:
+
+```
+OPENALEX_EMAIL=your.email@example.com
+```
+
+This will place you in the OpenAlex "polite pool" for better rate limits.
 
 ## Current Status
 

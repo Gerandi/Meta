@@ -1,5 +1,16 @@
 # Meta Project - Implementation Notes
 
+## Recent Changes
+
+### OpenAlex Migration (April 2025)
+
+We've successfully completed the migration from multiple search providers to relying solely on the OpenAlex API. Key changes include:
+
+1. **Simplified Backend**: Removed multiple provider implementations and standardized on OpenAlex for all paper searches
+2. **Better API Configuration**: Added proper email configuration for the OpenAlex polite pool
+3. **Improved Frontend**: Removed provider selection UI elements as they're no longer needed
+4. **Consistent Results**: All search results now come from the same high-quality source
+
 ## Issues Fixed
 
 1. **[object Object] error when selecting a specific database**: Fixed by implementing a centralized error handling function for all API providers, which properly handles errors and returns an empty array instead of propagating the error object.
@@ -10,22 +21,17 @@
 
 ## Backend Changes
 
-### API Client (api_client.py)
+### OpenAlex Search (openalex_search.py)
 
-1. Added `calculate_relevance_score` function to determine how relevant a paper is to the search query.
-2. Implemented `get_provider_data` to centralize error handling for all provider API calls.
-3. Maintained backward compatibility with existing API functions.
+1. Enhanced implementation to properly use configuration settings for email
+2. Improved error handling for API requests
+3. Enhanced result formatting for consistent output
 
-### Additional Providers (additional_providers.py)
+### Paper Search Service (paper_search_service.py)
 
-1. Rewrote `search_papers_combined` to:
-   - Use the centralized error handling
-   - Filter results by relevance score
-   - Handle pagination locally
-   - Properly sort results by relevance
-   - Remove duplicates more effectively
-
-2. Updated provider-specific search functions to use the new centralized error handling.
+1. Completely refactored to rely solely on OpenAlex
+2. Removed all other provider implementations
+3. Maintained API compatibility by keeping parameters structure
 
 ## Frontend Changes
 
@@ -43,9 +49,8 @@
 ## How to Test
 
 1. Search for papers using any keywords.
-2. Change databases (providers) and verify no errors occur.
-3. Check that results are relevant to your search query.
-4. Test pagination by navigating between pages and verify that:
+2. Check that results are relevant to your search query.
+3. Test pagination by navigating between pages and verify that:
    - It's faster than before (no loading spinner between pages)
    - The results are consistent (same papers shown in the same order)
    - No unexpected errors appear in the console

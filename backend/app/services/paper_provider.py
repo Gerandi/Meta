@@ -9,20 +9,19 @@ import unicodedata
 from datetime import datetime
 
 from app.core.config import settings
-from app.services.api_client import get_crossref_data, get_unpaywall_data
+from app.services.openalex_search import search_papers_openalex
 
 logger = logging.getLogger(__name__)
 
-async def search_papers_crossref(query: str, limit: int = 20, offset: int = 0, 
-                                year_from: Optional[int] = None, year_to: Optional[int] = None,
-                                journal: Optional[str] = None, author: Optional[str] = None,
-                                open_access_only: bool = False,
-                                sort: Optional[str] = None) -> Tuple[List[Dict[str, Any]], int]:
+async def search_papers(query: str, limit: int = 20, offset: int = 0, 
+                       year_from: Optional[int] = None, year_to: Optional[int] = None,
+                       journal: Optional[str] = None, author: Optional[str] = None,
+                       open_access_only: bool = False,
+                       sort: Optional[str] = None) -> Tuple[List[Dict[str, Any]], int]:
     """
-    Search for papers using the Crossref API
+    Search for papers using OpenAlex API
     """
-    # Use our standardized API client
-    papers, total_results = await get_crossref_data(
+    return await search_papers_openalex(
         query=query,
         limit=limit,
         offset=offset,
@@ -30,19 +29,25 @@ async def search_papers_crossref(query: str, limit: int = 20, offset: int = 0,
         year_to=year_to,
         journal=journal,
         author=author,
+        open_access_only=open_access_only,
         sort=sort
     )
-    
-    return papers, total_results
-
 
 async def get_paper_access(doi: str) -> Dict[str, Any]:
     """
-    Get open access information for a paper using the Unpaywall API.
+    Get open access information for a paper using OpenAlex with fallback to Unpaywall.
     """
-    # Use our standardized API client
-    return await get_unpaywall_data(doi)
-
+    # Import here to avoid circular imports
+    from app.services.pdf_service import get_paper_details
+    
+    details = await get_paper_details(doi)
+    
+    return {
+        "is_oa": details.get("is_oa", False),
+        "open_access_url": details.get("pdf_url"),
+        "url": details.get("url"),
+        "oa_status": details.get("oa_status")
+    }
 
 def clean_author(author_string: str) -> str:
     """Clean up an author string to extract the last name of the first author"""
@@ -50,19 +55,17 @@ def clean_author(author_string: str) -> str:
     from app.services.doi_service import clean_author as doi_clean_author
     return doi_clean_author(author_string)
 
-
 async def get_doi_for_paper(title: str, author: str, year: str) -> Optional[str]:
     """
-    Find DOI for a paper based on title, author, and year
+    Find DOI for a paper based on title, author, and year using OpenAlex
     """
     # Import here to avoid circular imports
     from app.services.doi_service import get_doi_for_paper as doi_get_doi
     return await doi_get_doi(title, author, year)
 
-
 async def get_dois_for_papers(papers: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """
-    Find DOIs for multiple papers
+    Find DOIs for multiple papers using OpenAlex
     
     Args:
         papers: List of dictionaries containing paper information
@@ -75,19 +78,17 @@ async def get_dois_for_papers(papers: List[Dict[str, str]]) -> List[Dict[str, st
     from app.services.doi_service import get_dois_for_papers as doi_get_dois
     return await doi_get_dois(papers)
 
-
 async def get_paper_pdf_url(doi: str) -> Optional[str]:
     """
-    Get PDF URL for a paper if available as open access
+    Get PDF URL for a paper if available as open access using OpenAlex with fallback to Unpaywall
     """
     # Import here to avoid circular imports
     from app.services.pdf_service import get_paper_pdf_url as pdf_get_url
     return await pdf_get_url(doi)
 
-
 async def process_csv_for_dois(csv_content: str) -> List[Dict[str, Any]]:
     """
-    Process a CSV file to find DOIs for papers
+    Process a CSV file to find DOIs for papers using OpenAlex
     
     Args:
         csv_content: Content of CSV file as string
@@ -114,10 +115,9 @@ async def process_csv_for_dois(csv_content: str) -> List[Dict[str, Any]]:
     results = await doi_get_dois(papers)
     return results
 
-
 async def process_csv_for_pdfs(papers_with_doi: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Process papers with DOIs to find PDF URLs
+    Process papers with DOIs to find PDF URLs using OpenAlex with fallback to Unpaywall
     
     Args:
         papers_with_doi: List of paper dictionaries with DOIs
@@ -143,15 +143,3 @@ async def process_csv_for_pdfs(papers_with_doi: List[Dict[str, Any]]) -> List[Di
         await asyncio.sleep(0.5)
     
     return results
-
-
-# Import modules
-import httpx
-
-# Import the additional providers
-from app.services.additional_providers import (
-    search_papers_semantic_scholar,
-    search_papers_scopus,
-    search_papers_exa,
-    search_papers_combined
-)

@@ -1,4 +1,4 @@
-        SIMPLE_SEARCH: `${API_BASE_URL}/papers/simple-search`,// API Configuration
+// API Configuration
 export const API_BASE_URL = 'http://localhost:8000';
 
 // Routes
