@@ -22,7 +22,7 @@ async def get_papers_for_processing(
     db: Session = Depends(get_db),
     skip: int = Query(0, description="Number of papers to skip"),
     limit: int = Query(100, description="Maximum number of papers to return"),
-    collection_id: Optional[int] = Query(None, description="Filter by collection ID"),
+    project_id: Optional[int] = Query(None, description="Filter by project ID"),
     filter_type: Optional[str] = Query(None, description="Filter by type (all, duplicates, incomplete, flagged)"),
     search: Optional[str] = Query(None, description="Search term"),
     sort_by: Optional[str] = Query("title", description="Sort field (title, author, year, journal)"),
@@ -34,9 +34,9 @@ async def get_papers_for_processing(
     # Start with a base query
     query = db.query(PaperModel)
     
-    # Apply collection filter if specified
-    if collection_id:
-        query = query.filter(PaperModel.collections.any(id=collection_id))
+    # Apply project filter if specified
+    if project_id:
+        query = query.filter(PaperModel.projects.any(id=project_id))
     
     # Apply search filter if specified
     if search:
@@ -210,7 +210,7 @@ async def update_paper_metadata(
 @router.get("/papers/find-duplicates", response_model=List[Dict[str, Any]])
 async def find_duplicate_papers(
     db: Session = Depends(get_db),
-    collection_id: Optional[int] = Query(None, description="Filter by collection ID")
+    project_id: Optional[int] = Query(None, description="Filter by project ID")
 ):
     """
     Find potential duplicate papers using title similarity.
@@ -222,9 +222,9 @@ async def find_duplicate_papers(
         func.count(PaperModel.id).label('count')
     )
     
-    # Apply collection filter if specified
-    if collection_id:
-        subquery = subquery.filter(PaperModel.collections.any(id=collection_id))
+    # Apply project filter if specified
+    if project_id:
+        subquery = subquery.filter(PaperModel.projects.any(id=project_id))
     
     subquery = subquery.group_by(
         PaperModel.title
@@ -238,9 +238,9 @@ async def find_duplicate_papers(
         PaperModel.title == subquery.c.title
     )
     
-    # Apply collection filter again to the main query
-    if collection_id:
-        query = query.filter(PaperModel.collections.any(id=collection_id))
+    # Apply project filter again to the main query
+    if project_id:
+        query = query.filter(PaperModel.projects.any(id=project_id))
     
     duplicate_papers = query.all()
     

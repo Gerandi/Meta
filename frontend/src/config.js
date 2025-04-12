@@ -34,14 +34,6 @@ export const API_ROUTES = {
         RETRIEVE_PDF: (id) => `${API_BASE_URL}/papers/${id}/retrieve-pdf`,
         COUNTS: `${API_BASE_URL}/papers/counts`,
     },
-    COLLECTIONS: {
-        LIST: `${API_BASE_URL}/collections`,
-        GET_BY_ID: (id) => `${API_BASE_URL}/collections/${id}`,
-        CREATE: `${API_BASE_URL}/collections`,
-        ADD_PAPER: (collectionId, paperId) => `${API_BASE_URL}/collections/${collectionId}/papers/${paperId}`,
-        REMOVE_PAPER: (collectionId, paperId) => `${API_BASE_URL}/collections/${collectionId}/papers/${paperId}`,
-        GET_PAPERS: (collectionId) => `${API_BASE_URL}/collections/${collectionId}/papers`,
-    },
     CODING: {
         CREATE: `${API_BASE_URL}/coding`,
         GET_BY_ID: (id) => `${API_BASE_URL}/coding/${id}`,

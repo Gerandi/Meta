@@ -17,23 +17,34 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# CORS middleware
+# CORS middleware - Updated allow_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for debugging
+    allow_origins=["http://localhost:5173"],  # Explicitly allow frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Initialize database
-init_db()
+# Initialize database on startup
+@app.on_event("startup")
+def on_startup():
+    logger.info("Running database initialization on startup...")
+    init_db()
+    logger.info("Database initialization complete.")
 
 # Add validation error handler
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     error_details = str(exc)
     logger.error(f"Validation error: {error_details}")
+    # Log the request body if possible/safe
+    try:
+        body = await request.json()
+        logger.error(f"Request body: {body}")
+    except Exception:
+        logger.error("Could not parse request body.")
+    logger.error(f"Full exception details: {exc.errors()}")
     return JSONResponse(
         status_code=422,
         content={
@@ -46,12 +57,12 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # General exception handler
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    logger.exception(f"Unhandled exception: {str(exc)}")
+    logger.exception(f"Unhandled exception during request to {request.url.path}: {str(exc)}")
     return JSONResponse(
         status_code=500,
         content={
             "detail": "Internal server error",
-            "message": str(exc)
+            "message": str(exc) # Provide exception message in response for debugging
         }
     )
 
@@ -59,4 +70,5 @@ async def general_exception_handler(request: Request, exc: Exception):
 app.include_router(api_router, prefix="")
 
 if __name__ == "__main__":
+    # Ensure the host is correct for accessibility if running in Docker later
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

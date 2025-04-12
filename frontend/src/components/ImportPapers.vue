@@ -25,7 +25,7 @@
           <h3 class="font-medium text-blue-800 mb-1">Import Your Papers</h3>
           <p class="text-blue-700 text-sm">
             Upload your PDFs in bulk or individually. We'll automatically extract titles, authors, and other metadata.
-            You can review and edit the extracted metadata before adding papers to your collection.
+            You can review and edit the extracted metadata before adding papers to your project.
           </p>
         </div>
       </div>

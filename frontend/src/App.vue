@@ -32,9 +32,17 @@
         @clear-active-project="clearActiveProject"
         @change-view="setActiveView"
         @process-papers="handleProcessPapers"
+        @add-to-project="showProjectSelectModal"
       />
     </div>
   </div>
+  <!-- Add ProjectSelectModal -->
+  <ProjectSelectModal
+    :show="isProjectModalVisible"
+    :papers="paperForProjectModal"
+    @close="isProjectModalVisible = false"
+    @paper-added="handlePaperAddedToProject"
+  />
 </template>
 
 <script>
@@ -70,7 +78,9 @@ export default {
       selectedPaper: null,
       selectedProjectId: null,
       selectedPapers: [], // Add selected papers array to store across navigation
-      activeProject: null
+      activeProject: null,
+      isProjectModalVisible: false,
+      paperForProjectModal: null
     }
   },
   computed: {
@@ -106,6 +116,10 @@ export default {
       if (this.activeView === 'processing') {
         return { selectedPapers: this.selectedPapers };
       }
+      // Pass activeProject to components that need it
+      if (['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'resultsTable'].includes(this.activeView)) {
+        return { activeProject: this.activeProject };
+      }
       return {};
     },
     needsProject() {
@@ -115,6 +129,14 @@ export default {
   },
   methods: {
     setActiveView(view) {
+      // Prevent accessing protected views without an active project
+      const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'resultsTable'];
+      if (!this.activeProject && protectedViews.includes(view)) {
+        console.warn(`Cannot navigate to ${view} without an active project.`);
+        // Redirect to projects view
+        this.activeView = 'projects';
+        return;
+      }
       this.activeView = view;
     },
     
@@ -136,12 +158,22 @@ export default {
       localStorage.setItem('activeProjectName', project.name);
       
       console.log('Active project set:', project.name);
+      
+      // If user was stuck on project selection prompt, navigate to dashboard
+      if (this.needsProject && this.activeView === 'projects') {
+        this.activeView = 'dashboard';
+      }
     },
     
     clearActiveProject() {
       this.activeProject = null;
       localStorage.removeItem('activeProjectId');
       localStorage.removeItem('activeProjectName');
+      
+      // If current view requires a project, redirect to projects view
+      if (this.needsProject) {
+        this.activeView = 'projects';
+      }
     },
 
     handleProcessPapers(papers) {
@@ -170,6 +202,20 @@ export default {
           this.clearActiveProject();
         }
       }
+    },
+    
+    // Method to show the project selection modal
+    showProjectSelectModal(paper) {
+      console.log("App.vue: showProjectSelectModal called with paper:", paper);
+      this.paperForProjectModal = paper;
+      this.isProjectModalVisible = true;
+    },
+    
+    // Handle successful addition
+    handlePaperAddedToProject(event) {
+      console.log(`${event.papers.length} paper(s) added to project ${event.projectId}`);
+      // Optionally show a success message
+      this.isProjectModalVisible = false; // Close modal
     }
   },
   mounted() {

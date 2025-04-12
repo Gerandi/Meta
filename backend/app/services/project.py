@@ -3,11 +3,13 @@ from sqlalchemy import func
 from typing import List, Optional, Dict, Any
 from fastapi import HTTPException
 from datetime import datetime
+import logging
 
 from app.models.project import Project as ProjectModel, paper_project
 from app.models.paper import Paper as PaperModel
 from app.schemas.project import ProjectCreate, ProjectUpdate
 
+logger = logging.getLogger(__name__)
 
 def get_project_by_id(db: Session, project_id: int) -> Optional[ProjectModel]:
     """
@@ -20,16 +22,23 @@ def create_project(db: Session, project: ProjectCreate) -> ProjectModel:
     """
     Create a new project.
     """
-    db_project = ProjectModel(
-        name=project.name,
-        description=project.description
-    )
-    
-    db.add(db_project)
-    db.commit()
-    db.refresh(db_project)
-    
-    return db_project
+    logger.info(f"Attempting to create project with name: {project.name}")
+    try:
+        db_project = ProjectModel(
+            name=project.name,
+            description=project.description
+        )
+        
+        db.add(db_project)
+        db.commit()
+        db.refresh(db_project)
+        logger.info(f"Project '{project.name}' created successfully with ID: {db_project.id}")
+        
+        return db_project
+    except Exception as e:
+        logger.exception(f"Database error creating project '{project.name}': {str(e)}") # Log exception with stack trace
+        db.rollback() # Rollback on error
+        raise HTTPException(status_code=500, detail=f"Database error: Could not create project. {str(e)}")
 
 
 def update_project(db: Session, project_id: int, project: ProjectUpdate) -> ProjectModel:

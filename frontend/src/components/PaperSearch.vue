@@ -742,23 +742,7 @@ export default {
         const response = await fetch(API_ROUTES.PROJECTS.LIST);
         
         if (!response.ok) {
-          // If projects endpoint fails, try collections as real data (not mock)
-          console.log('Projects API not available, using collections API');
-          const collectionsResponse = await fetch(API_ROUTES.COLLECTIONS.LIST);
-          
-          if (collectionsResponse.ok) {
-            const collections = await collectionsResponse.json();
-            // Use collections as projects
-            this.projects = collections.map(collection => ({
-              id: collection.id,
-              name: collection.name,
-              description: collection.description
-            }));
-            console.log(`Using ${this.projects.length} collections as projects`);
-            return;
-          }
-          
-          throw new Error('Failed to fetch projects or collections');
+          throw new Error('Failed to fetch projects');
         }
         
         this.projects = await response.json();
@@ -771,55 +755,23 @@ export default {
     
     async createProject() {
       try {
-        // Try to create a project first
-        let response = null;
-        let useCollections = false;
+        const response = await fetch(API_ROUTES.PROJECTS.CREATE, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(this.newProject)
+        });
         
-        try {
-          response = await fetch(API_ROUTES.PROJECTS.CREATE, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(this.newProject)
-          });
-          
-          if (!response.ok) {
-            useCollections = true;
-          }
-        } catch (e) {
-          console.log('Project creation API not available, trying collections API');
-          useCollections = true;
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || 'Failed to create project');
         }
         
-        if (useCollections) {
-          // If project API fails, create a collection instead
-          console.log('Using collections API to create project');
-          const collectionResponse = await fetch(API_ROUTES.COLLECTIONS.CREATE, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(this.newProject)
-          });
-          
-          if (!collectionResponse.ok) {
-            throw new Error('Failed to create collection');
-          }
-          
-          const collection = await collectionResponse.json();
-          this.projects.push({
-            id: collection.id,
-            name: collection.name,
-            description: collection.description
-          });
-          this.selectedProjectId = collection.id;
-        } else {
-          // Handle successful project creation
-          const project = await response.json();
-          this.projects.push(project);
-          this.selectedProjectId = project.id;
-        }
+        // Handle successful project creation
+        const project = await response.json();
+        this.projects.push(project);
+        this.selectedProjectId = project.id;
         
         // Reset form
         this.showCreateProjectForm = false;
@@ -842,58 +794,25 @@ export default {
         // Extract just the IDs from the papersToAddToProject array
         const paperIds = this.papersToAddToProject.map(paper => paper.id);
         
-        // Try the batch API endpoint for projects first
-        let response = null;
-        let useCollections = false;
+        const response = await fetch(API_ROUTES.PROJECTS.ADD_PAPERS_BATCH(this.selectedProjectId), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ paper_ids: paperIds })
+        });
         
-        try {
-          response = await fetch(`${API_ROUTES.PROJECTS.ADD_PAPERS_BATCH(this.selectedProjectId)}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ paper_ids: paperIds })
-          });
-          
-          if (!response.ok) {
-            useCollections = true;
-          } else {
-            // Handle successful project batch API response
-            const result = await response.json();
-            console.log('Project batch API result:', result);
-            alert(`${result.added_count || 0} paper(s) added to project successfully. ${result.skipped_count || 0} were already in the project.`);
-            this.showProjectModal = false;
-            this.papersToAddToProject = [];
-            return;
-          }
-        } catch (e) {
-          console.log('Project batch API not available, trying collections API');
-          useCollections = true;
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || `Failed to add papers to project: ${response.status}`);
         }
         
-        // If project batch API fails, try collections API
-        if (useCollections) {
-          console.log('Using collections API instead');
-          const promises = paperIds.map(paperId => {
-            return fetch(`${API_ROUTES.COLLECTIONS.ADD_PAPER(this.selectedProjectId, paperId)}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            });
-          });
-          
-          const results = await Promise.allSettled(promises);
-          const successCount = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
-          
-          if (successCount === 0) {
-            throw new Error('Failed to add any papers to collection');
-          }
-          
-          alert(`${successCount} paper(s) added to collection successfully.`);
-          this.showProjectModal = false;
-          this.papersToAddToProject = [];
-        }
+        // Handle successful project batch API response
+        const result = await response.json();
+        console.log('Project batch API result:', result);
+        alert(`${result.added_count || 0} paper(s) added to project successfully. ${result.skipped_count || 0} were already in the project.`);
+        this.showProjectModal = false;
+        this.papersToAddToProject = [];
       } catch (error) {
         console.error('Error adding papers to project:', error);
         alert('There was a problem adding papers to the project: ' + error.message);

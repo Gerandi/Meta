@@ -1196,7 +1196,7 @@ export default {
     // Remove papers
     confirmRemove(paper) {
       this.confirmationTitle = 'Remove Paper';
-      this.confirmationMessage = `Are you sure you want to remove "${paper.title}"? This will remove the paper from all collections.`;
+      this.confirmationMessage = `Are you sure you want to remove "${paper.title}"? This will remove the paper from all projects.`;
       this.confirmationButtonText = 'Remove';
       this.confirmationAction = () => this.removePaper(paper.id);
       this.showConfirmationModal = true;
