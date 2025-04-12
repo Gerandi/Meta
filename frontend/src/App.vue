@@ -1,12 +1,35 @@
 <template>
   <div class="flex h-screen bg-gray-100">
-    <Sidebar :activeView="activeView" @change-view="setActiveView" />
+    <Sidebar 
+      :activeView="activeView" 
+      :activeProject="activeProject"
+      @change-view="setActiveView" 
+      @set-active-project="setActiveProject"
+    />
     <div class="flex-1 overflow-auto">
+      <div v-if="needsProject && !activeProject" class="p-6 text-center">
+        <div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
+          <font-awesome-icon icon="folder-open" class="text-gray-400 text-5xl mb-4" />
+          <h2 class="text-xl font-medium mb-4">Please Select a Project</h2>
+          <p class="text-gray-600 mb-6">You need to select or create a project before you can access this page.</p>
+          <div class="flex justify-center space-x-4">
+            <button 
+              class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+              @click="setActiveView('projects')"
+            >
+              Go to Projects
+            </button>
+          </div>
+        </div>
+      </div>
       <component 
+        v-else
         :is="currentView" 
         v-bind="componentProps"
         @select-paper="handleSelectPaper"
-        @view-collection="handleViewCollection"
+        @view-project="handleViewProject"
+        @set-active-project="setActiveProject"
+        @clear-active-project="clearActiveProject"
         @change-view="setActiveView"
         @process-papers="handleProcessPapers"
       />
@@ -22,8 +45,10 @@ import PdfViewer from './components/PdfViewer.vue';
 import PaperProcessing from './components/PaperProcessing.vue';
 import CodingSheet from './components/CodingSheet.vue';
 import ResultsTable from './components/ResultsTable.vue';
-import Collections from './components/Collections.vue';
-import CollectionDetail from './components/CollectionDetail.vue';
+import Projects from './components/Projects.vue';
+import ProjectDetail from './components/ProjectDetail.vue';
+import ProjectSelectModal from './components/ProjectSelectModal.vue';
+import { API_ROUTES } from './config.js';
 
 export default {
   name: 'App',
@@ -35,15 +60,17 @@ export default {
     PaperProcessing,
     CodingSheet,
     ResultsTable,
-    Collections,
-    CollectionDetail
+    Projects,
+    ProjectDetail,
+    ProjectSelectModal
   },
   data() {
     return {
       activeView: 'dashboard',
       selectedPaper: null,
-      selectedCollectionId: null,
-      selectedPapers: [] // Add selected papers array to store across navigation
+      selectedProjectId: null,
+      selectedPapers: [], // Add selected papers array to store across navigation
+      activeProject: null
     }
   },
   computed: {
@@ -61,10 +88,10 @@ export default {
           return CodingSheet;
         case 'resultsTable':
           return ResultsTable;
-        case 'collections':
-          return Collections;
-        case 'collectionDetail':
-          return CollectionDetail;
+        case 'projects':
+          return Projects;
+        case 'projectDetail':
+          return ProjectDetail;
         default:
           return Dashboard;
       }
@@ -73,34 +100,81 @@ export default {
       if (this.activeView === 'viewer' && this.selectedPaper) {
         return { paper: this.selectedPaper };
       }
-      if (this.activeView === 'collectionDetail' && this.selectedCollectionId) {
-        return { collectionId: this.selectedCollectionId };
+      if (this.activeView === 'projectDetail' && this.selectedProjectId) {
+        return { projectId: this.selectedProjectId };
       }
       if (this.activeView === 'processing') {
         return { selectedPapers: this.selectedPapers };
       }
       return {};
+    },
+    needsProject() {
+      const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'resultsTable'];
+      return protectedViews.includes(this.activeView);
     }
   },
   methods: {
     setActiveView(view) {
       this.activeView = view;
     },
+    
     handleSelectPaper(paper) {
       this.selectedPaper = paper;
       this.activeView = 'viewer';
     },
     
-    handleViewCollection(collectionId) {
-      this.selectedCollectionId = collectionId;
-      this.activeView = 'collectionDetail';
+    handleViewProject(projectId) {
+      this.selectedProjectId = projectId;
+      this.activeView = 'projectDetail';
+    },
+    
+    setActiveProject(project) {
+      this.activeProject = project;
+      
+      // Save to localStorage for persistence
+      localStorage.setItem('activeProjectId', project.id);
+      localStorage.setItem('activeProjectName', project.name);
+      
+      console.log('Active project set:', project.name);
+    },
+    
+    clearActiveProject() {
+      this.activeProject = null;
+      localStorage.removeItem('activeProjectId');
+      localStorage.removeItem('activeProjectName');
     },
 
     handleProcessPapers(papers) {
       // Store the selected papers and navigate to processing page
       this.selectedPapers = papers;
       this.activeView = 'processing';
+    },
+    
+    async loadActiveProject() {
+      const projectId = localStorage.getItem('activeProjectId');
+      
+      if (projectId) {
+        try {
+          const response = await fetch(API_ROUTES.PROJECTS.GET_BY_ID(projectId));
+          
+          if (response.ok) {
+            const project = await response.json();
+            this.activeProject = project;
+            console.log('Loaded active project:', project.name);
+          } else {
+            // If error, clear the stored active project
+            this.clearActiveProject();
+          }
+        } catch (error) {
+          console.error('Error loading active project:', error);
+          this.clearActiveProject();
+        }
+      }
     }
+  },
+  mounted() {
+    // Load active project from localStorage if available
+    this.loadActiveProject();
   }
 }
 </script>

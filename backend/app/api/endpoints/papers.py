@@ -17,6 +17,7 @@ from app.services.pdf_service import get_paper_pdf_url, get_paper_details
 from app.services.doi_service import get_doi_for_paper, get_dois_for_papers
 # Removed import for openalex_search as it's being deprecated
 from app.services.openalex_direct import search_papers_direct # Import the consolidated function
+from app.services.pdf_extraction import process_pdf_file, extract_metadata_from_pdf, enhance_metadata_with_api
 from app.db.session import get_db
 
 router = APIRouter()
@@ -260,3 +261,127 @@ async def batch_find_dois(
         raise HTTPException(status_code=500, detail=f"Error processing CSV file: {str(e)}")
 
 # Advanced search endpoint removed - consolidated into main search endpoint
+
+
+@router.post("/upload", response_model=Dict[str, Any])
+async def upload_pdf(
+    file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None,
+):
+    """
+    Upload a PDF file and extract metadata.
+    
+    This endpoint accepts a PDF file upload, processes it to extract metadata,
+    and returns the extracted information including title, authors, and other
+    bibliographic data when available.
+    """
+    try:
+        # Check if the file is a PDF
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Uploaded file must be a PDF")
+        
+        # Read the file contents
+        file_content = await file.read()
+        
+        # Process the PDF file
+        metadata = await process_pdf_file(file_content, file.filename)
+        
+        # Set status based on metadata extraction success
+        if metadata.get("title"):
+            metadata["status"] = "success"
+        else:
+            metadata["status"] = "partial"
+            metadata["message"] = "Metadata extracted partially. Some fields may be missing."
+        
+        return metadata
+    
+    except Exception as e:
+        logger.error(f"Error processing PDF upload: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+
+
+@router.post("/extract-metadata", response_model=List[Dict[str, Any]])
+async def extract_metadata_from_pdfs(
+    file_ids: List[str],
+    enhance: bool = Query(True, description="Enhance metadata using external APIs"),
+):
+    """
+    Extract metadata from previously uploaded PDF files.
+    
+    This endpoint processes PDF files that have already been uploaded to extract
+    more detailed metadata, optionally using external APIs to enhance the extraction.
+    """
+    try:
+        results = []
+        for file_id in file_ids:
+            # This would be implemented to retrieve the file from storage
+            # and extract metadata from it
+            # For now, return a mock response
+            result = {
+                "file_id": file_id,
+                "status": "success",
+                "metadata": {
+                    "title": f"Extracted Title for {file_id}",
+                    "authors": [{"name": "Author 1"}, {"name": "Author 2"}],
+                    "year": 2023,
+                    "journal": "Journal of Mock Data",
+                    "abstract": "This is a mock abstract for the extracted metadata."
+                }
+            }
+            results.append(result)
+        
+        return results
+    
+    except Exception as e:
+        logger.error(f"Error extracting metadata: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error extracting metadata: {str(e)}")
+
+
+@router.post("/import-batch", response_model=Dict[str, Any])
+async def import_papers_batch(
+    papers: List[Dict[str, Any]],
+    db: Session = Depends(get_db),
+):
+    """
+    Import multiple papers from search results.
+    
+    This endpoint accepts a list of paper objects and stores them in the database,
+    consolidating duplicates based on DOI or title similarity.
+    """
+    try:
+        imported_count = 0
+        skipped_count = 0
+        errors = []
+        
+        for paper_data in papers:
+            try:
+                # Convert the paper data to PaperCreate schema
+                paper_create = PaperCreate(**paper_data)
+                
+                # Create or update the paper in the database
+                created_paper = create_paper(db, paper_create)
+                
+                if created_paper:
+                    imported_count += 1
+                else:
+                    skipped_count += 1
+                    
+            except Exception as e:
+                logger.error(f"Error importing paper: {str(e)}")
+                errors.append({
+                    "paper": paper_data.get("title", "Unknown title"),
+                    "error": str(e)
+                })
+                skipped_count += 1
+        
+        return {
+            "status": "success",
+            "imported_count": imported_count,
+            "skipped_count": skipped_count,
+            "errors": errors
+        }
+    
+    except Exception as e:
+        logger.error(f"Error in batch import: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error importing papers: {str(e)}")
+

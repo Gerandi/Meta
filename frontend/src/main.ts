@@ -29,7 +29,10 @@ import {
   faFolderOpen,
   faEllipsisV,
   faArrowLeft,
-  faFileUpload
+  faFileUpload,
+  faExchangeAlt,
+  faArrowRight,
+  faTasks
 } from '@fortawesome/free-solid-svg-icons'
 
 // Add icons to the library
@@ -55,7 +58,10 @@ library.add(
   faFolderOpen,
   faEllipsisV,
   faArrowLeft,
-  faFileUpload
+  faFileUpload,
+  faExchangeAlt,
+  faArrowRight,
+  faTasks
 )
 
 // Create Vue app

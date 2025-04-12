@@ -1,427 +1,209 @@
 <template>
-  <div class="p-6">
-    <!-- Announcement Banner -->
-    <div class="bg-indigo-50 border border-indigo-200 text-indigo-700 p-4 rounded-lg mb-6">
-      <div class="flex items-center">
-        <div class="flex-shrink-0">
-          <svg class="h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clip-rule="evenodd" />
-          </svg>
-        </div>
-        <div class="ml-3">
-          <h3 class="text-sm font-medium">New Search Engine!</h3>
-          <div class="text-sm">
-            We've upgraded our search to use OpenAlex, providing better results and faster performance. <a href="https://openalex.org/" target="_blank" class="font-medium underline">Learn more</a>
+  <div class="p-6 bg-gray-50">
+    <div class="max-w-6xl mx-auto">
+      <div class="mb-8">
+        <h1 class="text-2xl font-bold mb-6">Add Papers</h1>
+
+        <!-- Tabs -->
+        <div class="bg-white rounded-lg shadow mb-6">
+          <div class="border-b px-6 py-4">
+            <div class="flex space-x-4">
+              <button 
+                class="py-2 px-4 font-medium flex items-center border-b-2 focus:outline-none"
+                :class="activeTab === 'search' ? 'text-indigo-600 border-indigo-600' : 'text-gray-600 border-transparent hover:text-indigo-600'"
+                @click="activeTab = 'search'"
+              >
+                <font-awesome-icon icon="search" class="mr-2" />
+                Search Databases
+              </button>
+              <button 
+                class="py-2 px-4 font-medium flex items-center border-b-2 focus:outline-none"
+                :class="activeTab === 'upload' ? 'text-indigo-600 border-indigo-600' : 'text-gray-600 border-transparent hover:text-indigo-600'"
+                @click="activeTab = 'upload'"
+              >
+                <font-awesome-icon icon="upload" class="mr-2" />
+                Upload PDFs
+              </button>
+            </div>
+          </div>
+
+          <!-- Tab Content -->
+          <div class="p-6">
+            <SearchTab v-if="activeTab === 'search'" 
+              :isLoading="isLoading"
+              :searchQuery="searchQuery"
+              :filters="filters"
+              :showMoreFilters="showMoreFilters"
+              :error="error"
+              :results="results"
+              :totalResults="totalResults"
+              :currentPage="currentPage"
+              :totalPages="totalPages"
+              :selectedPapers="selectedPapers"
+              :allSelected="allSelected"
+              @search="searchPapers"
+              @update:searchQuery="searchQuery = $event"
+              @update:filters="filters = $event"
+              @toggle-more-filters="showMoreFilters = !showMoreFilters"
+              @clear-filters="clearFilters"
+              @toggle-select-all="toggleSelectAll"
+              @toggle-selection="toggleSelection"
+              @prev-page="prevPage"
+              @next-page="nextPage"
+              @view-paper="viewPaper"
+              @download-pdf="downloadPdf"
+              @add-to-project="addToProject"
+              @view-details="viewDetails"
+              @add-selected-to-project="addSelectedToProject"
+            />
+            <UploadTab v-else 
+              :uploadQueue="uploadQueue"
+              :extractionOptions="extractionOptions"
+              @upload-files="handleFileUpload"
+              @update:extractionOptions="extractionOptions = $event"
+              @remove-from-queue="removeFromQueue"
+              @process-uploads="processUploads"
+            />
           </div>
         </div>
-        <div class="ml-auto pl-3">
-          <button @click="$el.querySelector('.bg-indigo-50').style.display = 'none'" class="inline-flex text-indigo-500 focus:outline-none">
-            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-            </svg>
-          </button>
+
+        <!-- Imported Papers Section -->
+        <div class="bg-white rounded-lg shadow">
+          <div class="border-b px-6 py-4 flex justify-between items-center">
+            <h2 class="text-lg font-semibold">Imported Papers ({{ importedPapers.length || 0 }})</h2>
+
+            <div class="flex space-x-2">
+              <button class="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 flex items-center hover:bg-gray-50">
+                <font-awesome-icon icon="filter" class="mr-1.5" />
+                Filter
+              </button>
+              <button 
+                class="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 flex items-center hover:bg-gray-50"
+                @click="showProjectModal = true"
+                :disabled="selectedImportedPapers.length === 0"
+              >
+                <font-awesome-icon icon="plus-circle" class="mr-1.5" />
+                Add to Project
+              </button>
+            </div>
+          </div>
+
+          <!-- Imported Papers List -->
+          <div class="divide-y">
+            <ImportedPaperItem 
+              v-for="paper in importedPapers" 
+              :key="paper.id" 
+              :paper="paper"
+              :selected="isImportedSelected(paper.id)"
+              @toggle-selection="toggleImportedSelection(paper.id)"
+              @view="viewPaper(paper)"
+              @download="downloadPdf(paper)"
+              @remove="removePaper(paper.id)"
+            />
+            <div v-if="importedPapers.length === 0" class="p-10 text-center text-gray-500">
+              No papers imported yet. Use the tabs above to search or upload papers.
+            </div>
+          </div>
         </div>
       </div>
     </div>
-    <!-- CSV Upload Modal -->
-    <div v-if="showCsvUploadModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+
+    <!-- Project Select Modal -->
+    <div v-if="showProjectModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
       <div class="bg-white rounded-lg p-6 w-1/2 max-w-xl">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-semibold">Upload Papers from CSV</h2>
-          <button @click="showCsvUploadModal = false" class="text-gray-500 hover:text-gray-700">
+          <h2 class="text-xl font-semibold">Add to Project</h2>
+          <button @click="showProjectModal = false" class="text-gray-500 hover:text-gray-700">
             <font-awesome-icon icon="times" />
           </button>
         </div>
-        <p class="mb-4 text-gray-600">Upload a CSV file containing paper details. The file must include columns for <strong>title</strong>, <strong>authors</strong>, and <strong>year</strong>.</p>
         
-        <div class="mb-4">
-          <label class="block text-gray-700 mb-2">Select CSV File</label>
-          <input 
-            type="file" 
-            ref="csvFileInput"
-            accept=".csv"
-            class="block w-full text-gray-700 border border-gray-300 rounded py-2 px-3"
-          />
+        <div class="mb-6">
+          <label class="block text-gray-700 mb-2">Select Project</label>
+          <select 
+            v-model="selectedProjectId"
+            class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+          >
+            <option value="">-- Select a Project --</option>
+            <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name }}</option>
+          </select>
+          
+          <div class="mt-4">
+            <button 
+              @click="showCreateProjectForm = !showCreateProjectForm"
+              class="text-indigo-600 text-sm flex items-center"
+            >
+              <font-awesome-icon icon="plus" class="mr-1" /> Create New Project
+            </button>
+          </div>
+          
+          <div v-if="showCreateProjectForm" class="mt-4 p-4 bg-gray-50 rounded-lg">
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+              <input 
+                v-model="newProject.name"
+                type="text" 
+                class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                placeholder="Enter project name"
+              />
+            </div>
+            
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+              <textarea 
+                v-model="newProject.description"
+                class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                placeholder="Brief description of this project"
+                rows="3"
+              ></textarea>
+            </div>
+            
+            <div class="flex justify-end">
+              <button 
+                @click="createProject"
+                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                :disabled="!newProject.name"
+              >
+                Create Project
+              </button>
+            </div>
+          </div>
         </div>
         
         <div class="flex justify-end">
           <button 
-            @click="showCsvUploadModal = false" 
+            @click="showProjectModal = false" 
             class="mr-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
           >Cancel</button>
           <button 
-            @click="uploadCsvFile" 
+            @click="addPapersToProject" 
             class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-            :disabled="csvUploading"
+            :disabled="!selectedProjectId"
           >
-            {{ csvUploading ? 'Uploading...' : 'Upload & Process' }}
+            Add to Project
           </button>
         </div>
       </div>
     </div>
-    
-    <!-- DOI Lookup Modal -->
-    <div v-if="showDoiLookupModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div class="bg-white rounded-lg p-6 w-1/2 max-w-xl">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-semibold">Paper DOI Lookup</h2>
-          <button @click="showDoiLookupModal = false" class="text-gray-500 hover:text-gray-700">
-            <font-awesome-icon icon="times" />
-          </button>
-        </div>
-        <p class="mb-4 text-gray-600">Enter paper details to find its DOI.</p>
-        
-        <div class="mb-4">
-          <label class="block text-gray-700 mb-2">Paper Title</label>
-          <input 
-            v-model="doiLookup.title"
-            type="text" 
-            placeholder="Enter paper title"
-            class="block w-full text-gray-700 border border-gray-300 rounded py-2 px-3"
-          />
-        </div>
-        
-        <div class="mb-4">
-          <label class="block text-gray-700 mb-2">First Author</label>
-          <input 
-            v-model="doiLookup.author"
-            type="text" 
-            placeholder="Enter first author (last name or full name)"
-            class="block w-full text-gray-700 border border-gray-300 rounded py-2 px-3"
-          />
-        </div>
-        
-        <div class="mb-4">
-          <label class="block text-gray-700 mb-2">Publication Year</label>
-          <input 
-            v-model="doiLookup.year"
-            type="number" 
-            placeholder="Enter publication year"
-            class="block w-full text-gray-700 border border-gray-300 rounded py-2 px-3"
-          />
-        </div>
-        
-        <div v-if="doiLookupResult" class="mb-4 p-4 rounded" :class="doiLookupResult.status === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
-          <div v-if="doiLookupResult.status === 'success'">
-            <p class="text-green-700 font-medium">DOI Found!</p>
-            <p class="text-gray-700">{{ doiLookupResult.doi }}</p>
-            <p v-if="doiLookupResult.pdf_url" class="mt-2">
-              <a :href="doiLookupResult.pdf_url" target="_blank" class="text-indigo-600 hover:text-indigo-800">
-                <font-awesome-icon icon="download" class="mr-1" /> Download PDF
-              </a>
-            </p>
-          </div>
-          <div v-else>
-            <p class="text-red-700 font-medium">DOI Not Found</p>
-            <p class="text-gray-700">{{ doiLookupResult.message }}</p>
-          </div>
-        </div>
-        
-        <div class="flex justify-end">
-          <button 
-            @click="showDoiLookupModal = false" 
-            class="mr-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-          >Close</button>
-          <button 
-            @click="lookupDoi" 
-            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-            :disabled="doiLookupLoading || !doiLookup.title || !doiLookup.author || !doiLookup.year"
-          >
-            {{ doiLookupLoading ? 'Searching...' : 'Find DOI' }}
-          </button>
-        </div>
-      </div>
-    </div>
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold">Find Papers</h1>
-      <div>
-        <button 
-          @click="showDoiLookupModal = true"
-          class="mr-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
-          <font-awesome-icon icon="search" class="mr-1" /> DOI Lookup
-        </button>
-        <button 
-          @click="showCsvUploadModal = true"
-          class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
-          <font-awesome-icon icon="file-upload" class="mr-1" /> Upload CSV
-        </button>
-      </div>
-    </div>
-    
-    <div class="bg-white rounded-lg p-6 shadow mb-6">
-      <div class="flex mb-4">
-        <div class="relative flex-1 mr-4">
-          <font-awesome-icon icon="search" class="absolute left-3 top-3 text-gray-400" />
-          <input 
-            v-model="searchQuery"
-            type="text" 
-            placeholder="Search by title, author, keywords..."
-            class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-            @keyup.enter="searchPapers"
-          />
-        </div>
-        <button 
-          class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
-          @click="searchPapers"
-          :disabled="isLoading"
-        >
-          {{ isLoading ? 'Searching...' : 'Search' }}
-        </button>
-      </div>
-      
-      <div class="flex flex-wrap -mx-2">
-        <div class="px-2 w-1/4">
-          <div class="mb-2 text-sm font-medium">Database</div>
-          <select 
-            v-model="filters.database"
-            class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-            disabled
-          >
-            <option value="openalex">OpenAlex</option>
-          </select>
-        </div>
-        <div class="px-2 w-1/4">
-          <div class="mb-2 text-sm font-medium">Year Range</div>
-          <div class="flex">
-            <input 
-              v-model="filters.yearFrom"
-              type="number" 
-              placeholder="From"
-              class="w-1/2 mr-2 border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-            />
-            <input 
-              v-model="filters.yearTo"
-              type="number" 
-              placeholder="To" 
-              class="w-1/2 border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-            />
-          </div>
-        </div>
-        <div class="px-2 w-1/4">
-          <div class="mb-2 text-sm font-medium">Study Type</div>
-          <select 
-            v-model="filters.studyType"
-            class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-          >
-            <option value="">All Types</option>
-            <option value="rct">RCT</option>
-            <option value="cohort">Cohort</option>
-            <option value="case-control">Case Control</option>
-            <option value="meta-analysis">Meta-Analysis</option>
-          </select>
-        </div>
-        <div class="px-2 w-1/4">
-          <div class="mb-2 text-sm font-medium">Sort By</div>
-          <select 
-            v-model="filters.sortBy"
-            class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-          >
-            <option value="relevance">Relevance</option>
-            <option value="date">Most Recent</option>
-            <option value="cited">Most Cited</option>
-            <option value="title">Title (A-Z)</option>
-          </select>
-        </div>
-      </div>
-      
-      <div class="flex justify-end mt-4">
-        <button 
-          class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
-          @click="showMoreFilters = !showMoreFilters"
-        >
-          <font-awesome-icon :icon="showMoreFilters ? 'minus' : 'plus'" class="mr-1" /> 
-          {{ showMoreFilters ? 'Fewer Filters' : 'More Filters' }}
-        </button>
-        <button 
-          class="flex items-center text-gray-600 hover:text-gray-800"
-          @click="clearFilters"
-        >
-          Clear All
-        </button>
-      </div>
-      
-      <div v-if="showMoreFilters" class="mt-4 pt-4 border-t">
-        <div class="flex flex-wrap -mx-2">
-          <div class="px-2 w-1/3 mb-4">
-            <div class="mb-2 text-sm font-medium">Journal</div>
-            <input 
-              v-model="filters.journal"
-              type="text" 
-              placeholder="Journal name..."
-              class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-            />
-          </div>
-          <div class="px-2 w-1/3 mb-4">
-            <div class="mb-2 text-sm font-medium">Author</div>
-            <input 
-              v-model="filters.author"
-              type="text" 
-              placeholder="Author name..."
-              class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-            />
-          </div>
-          <div class="px-2 w-1/3 mb-4">
-            <div class="mb-2 text-sm font-medium">Open Access Only</div>
-            <div class="pt-2">
-              <label class="inline-flex items-center">
-                <input 
-                  v-model="filters.openAccessOnly" 
-                  type="checkbox" 
-                  class="form-checkbox h-5 w-5 text-indigo-600"
-                >
-                <span class="ml-2 text-gray-700">Show only Open Access papers</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <div v-if="isLoading" class="text-center py-12">
-      <div class="spinner mb-4"></div>
-      <p class="text-gray-500">Searching for papers in OpenAlex...</p>
-    </div>
-    
-    <div v-else-if="error" class="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6">
-      <h3 class="font-medium mb-1">Error searching for papers</h3>
-      <p>{{ error }}</p>
-    </div>
-    
-    <div v-else-if="results.length > 0" class="bg-white rounded-lg shadow">
-      <div class="p-4 border-b flex justify-between items-center">
-        <div class="flex items-center">
-          <label class="inline-flex items-center mr-4">
-            <input 
-              type="checkbox" 
-              class="form-checkbox h-5 w-5 text-indigo-600"
-              :checked="allSelected"
-              @change="toggleSelectAll"
-            >
-            <span class="ml-2 text-gray-700">Select All</span>
-          </label>
-          <div class="font-medium">{{ totalResults }} Results</div>
-          <button 
-            v-if="selectedPapers.length > 0"
-            class="ml-4 px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 mr-2"
-            @click="addSelectedToCollection"
-          >
-            Add {{ selectedPapers.length }} Selected Papers to Collection
-          </button>
-          <button 
-            v-if="selectedPapers.length > 0"
-            class="ml-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
-            @click="processSelectedPapers"
-          >
-            Process {{ selectedPapers.length }} Selected Papers
-          </button>
-        </div>
-        <div class="flex items-center text-sm">
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button 
-            class="ml-4 px-2 py-1 border rounded-md hover:bg-gray-50"
-            :disabled="currentPage === 1"
-            @click="prevPage"
-          >Previous</button>
-          <button 
-            class="ml-2 px-2 py-1 border rounded-md hover:bg-gray-50"
-            :disabled="currentPage === totalPages"
-            @click="nextPage"
-          >Next</button>
-        </div>
-      </div>
-      
-      <div>
-        <div 
-          v-for="paper in results" 
-          :key="paper.id || paper.doi || paper.title"
-          class="p-4 border-b hover:bg-gray-50"
-          style="min-height: 200px; display: flex;"
-        >
-          <div class="flex w-full">
-            <div class="mr-3 pt-1">
-              <input 
-                type="checkbox"
-                class="form-checkbox h-5 w-5 text-indigo-600"
-                :checked="isSelected(paper)"
-                @change="toggleSelection(paper)"
-                @click.stop
-              >
-            </div>
-            <div class="flex-1 cursor-pointer flex flex-col justify-between" @click="viewPaper(paper)">
-              <div>
-                <div class="font-medium text-indigo-600 mb-1 line-clamp-2 text-lg" style="max-height: 3rem; overflow: hidden;">
-                  {{ paper.title }}
-                </div>
-                <div class="text-sm text-gray-700 mb-1 line-clamp-1">
-                  {{ formatAuthors(paper.authors) }}
-                </div>
-                <div class="text-sm text-gray-500 mb-2 flex items-center">
-                  <span class="truncate max-w-xs">{{ paper.journal || 'Unknown Journal' }}</span>
-                  <span class="mx-1">•</span>
-                  <span>{{ getYear(paper.publication_date) }}</span>
-                  <span v-if="paper.citation_count" class="ml-2 text-xs font-medium">
-                    <span class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">{{ paper.citation_count }} citations</span>
-                  </span>
-                  <span v-if="paper.source" class="ml-2 px-2 py-0.5 bg-gray-100 rounded-full text-xs">{{ paper.source }}</span>
-                </div>
-                <div class="text-sm text-gray-600 mb-3 line-clamp-3" style="max-height: 4.5rem; overflow: hidden;">
-                  {{ paper.abstract }}
-                </div>
-              </div>
-              <div class="flex mt-2 text-sm">
-                <button 
-                  v-if="paper.doi" 
-                  class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
-                  @click.stop="downloadPdf(paper)"
-                >
-                  <font-awesome-icon icon="download" class="mr-1" /> Get PDF
-                </button>
-                <button 
-                  class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
-                  @click.stop="addToCollection(paper)"
-                >
-                  <font-awesome-icon icon="plus-circle" class="mr-1" /> Add to Collection
-                </button>
-                <button 
-                  class="flex items-center text-indigo-600 hover:text-indigo-800"
-                  @click.stop="viewDetails(paper)"
-                >
-                  <font-awesome-icon icon="book" class="mr-1" /> View Details
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div v-if="results.length === 0" class="p-8 text-center">
-        <p class="text-gray-500">No results found. Try adjusting your search criteria.</p>
-      </div>
-    </div>
-    
-    <!-- Collection Select Modal -->
-    <CollectionSelectModal
-      :show="showCollectionModal"
-      :paper="selectedPaperForCollection"
-      @close="showCollectionModal = false"
-      @paper-added="handlePaperAdded"
-    />
   </div>
 </template>
 
 <script>
-import CollectionSelectModal from './CollectionSelectModal.vue';
+import SearchTab from './papers/find-papers/search-tab.vue';
+import UploadTab from './papers/find-papers/upload-tab.vue';
+import ImportedPaperItem from './papers/find-papers/imported-paper-item.vue';
 import { API_ROUTES, APP_CONFIG } from '../config.js';
 
 export default {
   name: 'PaperSearch',
   components: {
-    CollectionSelectModal
+    SearchTab,
+    UploadTab,
+    ImportedPaperItem
   },
   data() {
     return {
+      activeTab: 'search',
       searchQuery: '',
       filters: {
         database: 'openalex',
@@ -435,6 +217,7 @@ export default {
         providers: ['openalex']
       },
       selectedPapers: [],
+      selectedImportedPapers: [],
       allSelected: false,
       showMoreFilters: false,
       isLoading: false,
@@ -444,28 +227,41 @@ export default {
       currentPage: 1,
       totalPages: 1,
       itemsPerPage: APP_CONFIG.ITEMS_PER_PAGE,
-      showCollectionModal: false,
-      selectedPaperForCollection: null,
       
-      // CSV Upload Modal
-      showCsvUploadModal: false,
-      csvUploading: false,
-      csvResults: [],
-      
-      // DOI Lookup Modal
-      showDoiLookupModal: false,
-      doiLookup: {
-        title: '',
-        author: '',
-        year: null
+      // Upload tab
+      uploadQueue: [],
+      extractionOptions: {
+        extractMetadata: true,
+        applyCodingSheet: false,
+        addToProject: false
       },
-      doiLookupLoading: false,
-      doiLookupResult: null
-    }
+      
+      // Project management
+      showProjectModal: false,
+      projects: [],
+      selectedProjectId: '',
+      showCreateProjectForm: false,
+      newProject: {
+        name: '',
+        description: ''
+      },
+      
+      // Imported Papers
+      importedPapers: []
+    };
+  },
+  mounted() {
+    this.fetchProjects();
+    this.fetchImportedPapers();
   },
   methods: {
+    // Paper selection methods
     isSelected(paper) {
       return this.selectedPapers.some(p => this.isSamePaper(p, paper));
+    },
+    
+    isImportedSelected(paperId) {
+      return this.selectedImportedPapers.includes(paperId);
     },
     
     isSamePaper(paper1, paper2) {
@@ -478,21 +274,36 @@ export default {
     },
     
     toggleSelection(paper) {
+      console.log('Toggling selection for paper:', paper.title);
       if (this.isSelected(paper)) {
         this.selectedPapers = this.selectedPapers.filter(p => !this.isSamePaper(p, paper));
       } else {
         this.selectedPapers.push(paper);
       }
       this.updateAllSelected();
+      console.log('Selected papers:', this.selectedPapers.length);
+    },
+    
+    toggleImportedSelection(paperId) {
+      if (this.isImportedSelected(paperId)) {
+        this.selectedImportedPapers = this.selectedImportedPapers.filter(id => id !== paperId);
+      } else {
+        this.selectedImportedPapers.push(paperId);
+      }
     },
     
     toggleSelectAll() {
+      console.log('Toggling select all. Current state:', this.allSelected);
       if (this.allSelected) {
+        // If currently all selected, deselect all
         this.selectedPapers = [];
+        this.allSelected = false;
       } else {
+        // If not all selected, select all current results
         this.selectedPapers = [...this.results];
+        this.allSelected = true;
       }
-      this.allSelected = !this.allSelected;
+      console.log('New selection state:', this.selectedPapers.length, 'papers selected');
     },
     
     updateAllSelected() {
@@ -500,100 +311,7 @@ export default {
         this.results.every(paper => this.isSelected(paper));
     },
     
-    addSelectedToCollection() {
-      if (this.selectedPapers.length === 0) {
-        return;
-      }
-      
-      // Show the collection modal with multiple papers
-      this.selectedPaperForCollection = this.selectedPapers;
-      this.showCollectionModal = true;
-    },
-    
-    async uploadCsvFile() {
-      const fileInput = this.$refs.csvFileInput;
-      if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-        alert('Please select a CSV file to upload');
-        return;
-      }
-      
-      const file = fileInput.files[0];
-      if (!file.name.endsWith('.csv')) {
-        alert('Please select a CSV file');
-        return;
-      }
-      
-      this.csvUploading = true;
-      
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        const response = await fetch(`${API_ROUTES.PAPERS.BATCH_FIND_DOI}`, {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Error processing CSV file');
-        }
-        
-        const data = await response.json();
-        this.csvResults = data;
-        
-        // Show summary
-        const doisFound = data.filter(item => item.doi && item.doi !== 'Not found').length;
-        const total = data.length;
-        
-        alert(`Processed ${total} papers. Found DOIs for ${doisFound} papers (${Math.round(doisFound/total*100)}%)`);
-        
-        // Close modal after success
-        this.showCsvUploadModal = false;
-      } catch (err) {
-        alert(`Error: ${err.message}`);
-        console.error('Error uploading CSV:', err);
-      } finally {
-        this.csvUploading = false;
-      }
-    },
-    
-    async lookupDoi() {
-      if (!this.doiLookup.title || !this.doiLookup.author || !this.doiLookup.year) {
-        return;
-      }
-      
-      this.doiLookupLoading = true;
-      this.doiLookupResult = null;
-      
-      try {
-        const formData = new FormData();
-        formData.append('title', this.doiLookup.title);
-        formData.append('author', this.doiLookup.author);
-        formData.append('year', this.doiLookup.year);
-        
-        const response = await fetch(`${API_ROUTES.PAPERS.FIND_DOI}`, {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Error finding DOI');
-        }
-        
-        this.doiLookupResult = await response.json();
-      } catch (err) {
-        this.doiLookupResult = {
-          status: 'error',
-          message: `Error: ${err.message}`
-        };
-        console.error('Error looking up DOI:', err);
-      } finally {
-        this.doiLookupLoading = false;
-      }
-    },
-    
+    // Paper search methods
     async searchPapers() {
       // Clear previous error message
       this.error = null;
@@ -630,6 +348,12 @@ export default {
         const searchUrl = `${endpoint}?${params.toString()}`;
         
         console.log('Search URL:', searchUrl);
+        console.log('Search parameters:', { 
+          query: this.searchQuery,
+          filters: this.filters,
+          page: this.currentPage,
+          perPage: this.itemsPerPage
+        });
         
         const response = await fetch(searchUrl, {
           method: 'GET',
@@ -659,6 +383,7 @@ export default {
         }
         
         const data = await response.json();
+        console.log('Search response data:', data);
         
         // Use results directly from backend
         this.results = data.results || [];
@@ -666,12 +391,11 @@ export default {
         
         // Calculate total pages based on backend total and itemsPerPage
         this.totalPages = Math.ceil(this.totalResults / this.itemsPerPage);
+        console.log(`Found ${this.totalResults} results, ${this.totalPages} pages`);
         
         // Ensure currentPage is not out of bounds after search
         if (this.currentPage > this.totalPages && this.totalPages > 0) {
           this.currentPage = this.totalPages;
-          // Optionally re-fetch if page was adjusted, though usually not necessary
-          // await this.searchPapers(); // Re-fetch might cause loop if API behaves unexpectedly
         } else if (this.totalPages === 0) {
           this.currentPage = 1; // Reset to page 1 if no results
         }
@@ -683,12 +407,6 @@ export default {
         // Reset selection
         this.selectedPapers = [];
         this.allSelected = false;
-        
-        // Log metadata if available
-        if (data.metadata) {
-          console.log('Search metadata:', data.metadata);
-        }
-        
       } catch (err) {
         let errorMessage = 'Failed to search papers';
         
@@ -705,50 +423,6 @@ export default {
       }
     },
     
-    formatAuthors(authors) {
-      if (!authors || authors.length === 0) return 'Unknown Authors';
-      
-      // Handle different author formats from various providers
-      const getAuthorName = (author) => {
-        if (typeof author === 'string') return author;
-        if (typeof author === 'object' && author !== null) {
-          if (author.name) return author.name;
-          // Handle possible alternative formats
-          if (author.firstName && author.lastName) return `${author.firstName} ${author.lastName}`;
-          if (author.given && author.family) return `${author.given} ${author.family}`;
-        }
-        return 'Unknown';
-      };
-      
-      if (authors.length <= 3) {
-        return authors.map(getAuthorName).join(', ');
-      } else {
-        return `${getAuthorName(authors[0])}, et al.`;
-      }
-    },
-    
-    getYear(dateString) {
-      if (!dateString) return 'Unknown Year';
-      
-      // Handle different date formats
-      try {
-        // Try to parse as ISO date
-        const year = new Date(dateString).getFullYear();
-        if (!isNaN(year)) return year;
-        
-        // Check if the string itself is just a year
-        if (/^\d{4}$/.test(dateString)) return dateString;
-        
-        // Try to extract year from a date string
-        const yearMatch = dateString.match(/\b(19|20)\d{2}\b/);
-        if (yearMatch) return yearMatch[0];
-      } catch (err) {
-        console.warn('Error parsing date:', dateString, err);
-      }
-      
-      return 'Unknown Year';
-    },
-    
     clearFilters() {
       this.filters = {
         database: 'openalex',
@@ -762,10 +436,9 @@ export default {
         providers: ['openalex']
       };
       
-      
       // Reset pagination
       this.currentPage = 1;
-      this.totalPages = 1; // Reset total pages as well
+      this.totalPages = 1;
       
       // If there was a search query, perform a new search with cleared filters
       if (this.searchQuery.trim()) {
@@ -775,6 +448,7 @@ export default {
     
     prevPage() {
       if (this.currentPage > 1) {
+        console.log(`Moving to previous page: ${this.currentPage} -> ${this.currentPage - 1}`);
         this.currentPage--;
         this.searchPapers();
       }
@@ -782,11 +456,223 @@ export default {
     
     nextPage() {
       if (this.currentPage < this.totalPages) {
+        console.log(`Moving to next page: ${this.currentPage} -> ${this.currentPage + 1}`);
         this.currentPage++;
         this.searchPapers();
       }
-    }, // Added comma
-
+    },
+    
+    // File upload methods
+    handleFileUpload(files) {
+      // Convert FileList to array and add to upload queue
+      const fileArray = Array.from(files);
+      
+      this.uploadQueue = [
+        ...this.uploadQueue,
+        ...fileArray.map(file => ({
+          file,
+          name: file.name,
+          size: file.size,
+          progress: 0,
+          status: 'queued'
+        }))
+      ];
+    },
+    
+    removeFromQueue(index) {
+      this.uploadQueue.splice(index, 1);
+    },
+    
+    async processUploads() {
+      if (this.uploadQueue.length === 0) return;
+      
+      for (let i = 0; i < this.uploadQueue.length; i++) {
+        const item = this.uploadQueue[i];
+        if (item.status !== 'complete') {
+          // Update status
+          this.$set(this.uploadQueue, i, { ...item, status: 'uploading' });
+          
+          try {
+            await this.uploadFile(item.file, i);
+            this.$set(this.uploadQueue, i, { ...this.uploadQueue[i], status: 'complete', progress: 100 });
+          } catch (error) {
+            this.$set(this.uploadQueue, i, { ...this.uploadQueue[i], status: 'error', error: error.message });
+            console.error(`Error uploading ${item.name}:`, error);
+          }
+        }
+      }
+      
+      // After all uploads complete, extract metadata if enabled
+      if (this.extractionOptions.extractMetadata) {
+        await this.extractMetadataFromUploads();
+      }
+      
+      // Add to project if enabled and project selected
+      if (this.extractionOptions.addToProject && this.selectedProjectId) {
+        await this.addUploadsToProject();
+      }
+      
+      // Refresh imported papers list
+      this.fetchImportedPapers();
+    },
+    
+    async uploadFile(file, index) {
+      return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = Math.round((event.loaded / event.total) * 100);
+            this.$set(this.uploadQueue, index, { ...this.uploadQueue[index], progress: percentComplete });
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              // Store file ID and other metadata returned from the server
+              this.$set(this.uploadQueue, index, {
+                ...this.uploadQueue[index],
+                id: response.file_id || response.id,
+                title: response.title,
+                authors: response.authors,
+                metadata: response
+              });
+              resolve(response);
+            } catch (e) {
+              console.error('Error parsing upload response:', e);
+              resolve(xhr.responseText);
+            }
+          } else {
+            reject(new Error(`Upload failed: ${xhr.statusText}`));
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error occurred during upload'));
+        });
+        
+        xhr.open('POST', API_ROUTES.PAPERS.UPLOAD);
+        xhr.send(formData);
+      });
+    },
+    
+    async extractMetadataFromUploads() {
+      // Extract metadata from the uploaded PDFs
+      try {
+        // Get file IDs from completed uploads
+        const uploadIds = this.uploadQueue
+          .filter(item => item.status === 'complete' && item.id)
+          .map(item => item.id);
+          
+        if (uploadIds.length === 0) {
+          console.log('No files with IDs found for metadata extraction');
+          return;
+        }
+        
+        console.log('Extracting metadata for files:', uploadIds);
+        
+        const response = await fetch(API_ROUTES.PAPERS.EXTRACT_METADATA, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ file_ids: uploadIds })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || 'Failed to extract metadata');
+        }
+        
+        const data = await response.json();
+        console.log('Metadata extraction results:', data);
+        
+        // Update queue items with extracted metadata
+        data.forEach(result => {
+          if (result.file_id && result.status === 'success') {
+            const queueIndex = this.uploadQueue.findIndex(item => item.id === result.file_id);
+            if (queueIndex !== -1) {
+              this.$set(this.uploadQueue, queueIndex, { 
+                ...this.uploadQueue[queueIndex],
+                metadata: result.metadata,
+                title: result.metadata.title,
+                authors: result.metadata.authors
+              });
+            }
+          }
+        });
+        
+        // After metadata extraction, we can import the papers to the library
+        this.importExtractedPapers();
+        
+      } catch (error) {
+        console.error('Error extracting metadata:', error);
+        alert('There was a problem extracting metadata from the uploaded files: ' + error.message);
+      }
+    },
+    
+    async importExtractedPapers() {
+      // Import papers with extracted metadata
+      try {
+        const papersToImport = this.uploadQueue
+          .filter(item => item.status === 'complete' && item.metadata)
+          .map(item => ({
+            title: item.metadata.title || item.name,
+            abstract: item.metadata.abstract,
+            authors: item.metadata.authors || [],
+            publication_date: item.metadata.year ? new Date(item.metadata.year, 0, 1).toISOString() : null,
+            journal: item.metadata.journal,
+            doi: item.metadata.doi,
+            file_path: item.metadata.file_path,
+            file_name: item.name,
+            source: 'PDF Upload'
+          }));
+        
+        if (papersToImport.length === 0) {
+          console.log('No papers with metadata to import');
+          return;
+        }
+        
+        console.log('Importing papers from uploads:', papersToImport);
+        
+        const response = await fetch(API_ROUTES.PAPERS.IMPORT_BATCH, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ papers: papersToImport })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || 'Failed to import papers');
+        }
+        
+        const result = await response.json();
+        console.log('Import result:', result);
+        
+        if (result.imported_count > 0) {
+          alert(`${result.imported_count} paper(s) imported successfully.`);
+          // Refresh imported papers list with real data
+          await this.fetchImportedPapers();
+          // Clear upload queue for successfully imported papers
+          this.uploadQueue = this.uploadQueue.filter(item => {
+            return item.status !== 'complete' || !item.metadata;
+          });
+        }
+        
+      } catch (error) {
+        console.error('Error importing papers from uploads:', error);
+        alert('There was a problem importing the papers: ' + error.message);
+      }
+    },
+    
+    // Viewing/managing papers
     viewPaper(paper) {
       // Navigate to PDF viewer with the selected paper
       this.$emit('select-paper', paper);
@@ -794,72 +680,301 @@ export default {
     
     async downloadPdf(paper) {
       this.isLoading = true;
+      console.log('Attempting to download PDF for paper:', paper.title);
+      
       try {
-        // Always fetch the PDF URL from the backend when requested
-        // This ensures we're not using stale data and only fetch when needed
+        // First check if we have a direct open_access_url
+        if (paper.open_access_url) {
+          console.log('Using direct open access URL:', paper.open_access_url);
+          window.open(paper.open_access_url, '_blank');
+          this.isLoading = false;
+          return;
+        }
+        
+        // Next try using the DOI if available
         if (paper.doi) {
-          // Use the open_access_url directly if available (now provided by backend)
-          if (paper.open_access_url) {
-             window.open(paper.open_access_url, '_blank');
-             this.isLoading = false;
-             return;
-          }
-          
-          // Fallback: If no direct OA URL, try fetching via DOI endpoint
+          console.log('Looking up PDF using DOI:', paper.doi);
           const response = await fetch(`${API_ROUTES.PAPERS.GET_PDF}/${encodeURIComponent(paper.doi)}`);
+          
           if (response.ok) {
             const data = await response.json();
+            console.log('PDF lookup response:', data);
+            
             if (data.pdf_url) {
               window.open(data.pdf_url, '_blank');
               this.isLoading = false;
               return;
+            } else {
+              throw new Error('No PDF URL returned from server');
+            }
+          } else {
+            // If API call fails, try to get error details
+            try {
+              const errorData = await response.json();
+              throw new Error(errorData.detail || `Server error: ${response.status}`);
+            } catch (e) {
+              throw new Error(`Server error: ${response.status} ${response.statusText}`);
             }
           }
-          
-          throw new Error('Could not retrieve PDF URL');
         } else {
-           throw new Error('No DOI available to fetch PDF');
+          throw new Error('No DOI or open access URL available for this paper');
         }
       } catch (err) {
-        console.error('Error fetching PDF URL:', err);
-        alert('The PDF could not be retrieved. It may not be publicly accessible.');
+        console.error('Error downloading PDF:', err);
+        alert(`Could not download PDF: ${err.message}. The PDF may not be publicly accessible.`);
       } finally {
         this.isLoading = false;
       }
     },
     
-    addToCollection(paper) {
-      this.selectedPaperForCollection = paper;
-      this.showCollectionModal = true;
+    viewDetails(paper) {
+      // View paper details
+      console.log('View details:', paper);
     },
     
-    handlePaperAdded({ papers, collectionId }) {
-      const count = Array.isArray(papers) ? papers.length : 1;
-      
-      // Show success message with collection navigation option
-      if (confirm(`${count} paper${count > 1 ? 's' : ''} added to collection successfully. Would you like to view this collection?`)) {
-        // Navigate to collection detail view
-        this.$emit('view-collection', collectionId);
-      }
-      
-      // Clear selections if multiple papers were added
-      if (count > 1) {
-        this.selectedPapers = [];
-        this.allSelected = false;
+    removePaper(paperId) {
+      // Remove a paper from imported list
+      this.importedPapers = this.importedPapers.filter(paper => paper.id !== paperId);
+      this.selectedImportedPapers = this.selectedImportedPapers.filter(id => id !== paperId);
+    },
+    
+    // Project management
+    async fetchProjects() {
+      try {
+        console.log('Fetching projects from:', API_ROUTES.PROJECTS.LIST);
+        const response = await fetch(API_ROUTES.PROJECTS.LIST);
+        
+        if (!response.ok) {
+          // If projects endpoint fails, try collections as real data (not mock)
+          console.log('Projects API not available, using collections API');
+          const collectionsResponse = await fetch(API_ROUTES.COLLECTIONS.LIST);
+          
+          if (collectionsResponse.ok) {
+            const collections = await collectionsResponse.json();
+            // Use collections as projects
+            this.projects = collections.map(collection => ({
+              id: collection.id,
+              name: collection.name,
+              description: collection.description
+            }));
+            console.log(`Using ${this.projects.length} collections as projects`);
+            return;
+          }
+          
+          throw new Error('Failed to fetch projects or collections');
+        }
+        
+        this.projects = await response.json();
+        console.log(`Fetched ${this.projects.length} projects`);
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+        this.projects = []; // Empty projects, no mock data
       }
     },
     
-    processSelectedPapers() {
+    async createProject() {
+      try {
+        // Try to create a project first
+        let response = null;
+        let useCollections = false;
+        
+        try {
+          response = await fetch(API_ROUTES.PROJECTS.CREATE, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(this.newProject)
+          });
+          
+          if (!response.ok) {
+            useCollections = true;
+          }
+        } catch (e) {
+          console.log('Project creation API not available, trying collections API');
+          useCollections = true;
+        }
+        
+        if (useCollections) {
+          // If project API fails, create a collection instead
+          console.log('Using collections API to create project');
+          const collectionResponse = await fetch(API_ROUTES.COLLECTIONS.CREATE, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(this.newProject)
+          });
+          
+          if (!collectionResponse.ok) {
+            throw new Error('Failed to create collection');
+          }
+          
+          const collection = await collectionResponse.json();
+          this.projects.push({
+            id: collection.id,
+            name: collection.name,
+            description: collection.description
+          });
+          this.selectedProjectId = collection.id;
+        } else {
+          // Handle successful project creation
+          const project = await response.json();
+          this.projects.push(project);
+          this.selectedProjectId = project.id;
+        }
+        
+        // Reset form
+        this.showCreateProjectForm = false;
+        this.newProject = { name: '', description: '' };
+      } catch (error) {
+        console.error('Error creating project:', error);
+        alert('There was a problem creating the project: ' + error.message);
+      }
+    },
+    
+    async addPapersToProject() {
+      if (!this.selectedProjectId || this.selectedImportedPapers.length === 0) return;
+      
+      try {
+        console.log(`Adding ${this.selectedImportedPapers.length} papers to project ${this.selectedProjectId}`);
+        
+        // Try projects API first
+        let response = null;
+        let useCollections = false;
+        
+        try {
+          response = await fetch(`${API_ROUTES.PROJECTS.ADD_PAPERS}/${this.selectedProjectId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ paper_ids: this.selectedImportedPapers })
+          });
+          
+          if (!response.ok) {
+            useCollections = true;
+          }
+        } catch (e) {
+          console.log('Project API not available, trying collections API');
+          useCollections = true;
+        }
+        
+        // If project API fails, try collections API
+        if (useCollections) {
+          console.log('Using collections API instead');
+          const promises = this.selectedImportedPapers.map(paperId => {
+            return fetch(`${API_ROUTES.COLLECTIONS.ADD_PAPER(this.selectedProjectId, paperId)}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+          });
+          
+          const results = await Promise.allSettled(promises);
+          const successCount = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
+          
+          if (successCount === 0) {
+            throw new Error('Failed to add any papers to collection');
+          }
+          
+          alert(`${successCount} paper(s) added to collection successfully.`);
+          this.showProjectModal = false;
+          this.selectedImportedPapers = [];
+          return;
+        }
+        
+        // Handle response from projects API
+        const result = await response.json();
+        alert(`${result.added_count || this.selectedImportedPapers.length} paper(s) added to project successfully.`);
+        this.showProjectModal = false;
+        this.selectedImportedPapers = [];
+      } catch (error) {
+        console.error('Error adding papers to project:', error);
+        alert('There was a problem adding papers to the project: ' + error.message);
+      }
+    },
+    
+    addToProject(paper) {
+      // Add single paper to selected project
+      if (paper.id) {
+        this.selectedImportedPapers = [paper.id];
+        this.showProjectModal = true;
+      } else {
+        console.error('Paper has no ID:', paper);
+      }
+    },
+    
+    addSelectedToProject() {
+      // First check if we have any papers selected
+      if (this.selectedPapers.length === 0) {
+        alert('Please select papers first');
+        return;
+      }
+      
+      // Import the selected papers
+      this.importSelectedPapers();
+    },
+    
+    async importSelectedPapers() {
       if (this.selectedPapers.length === 0) return;
       
-      // Emit event to pass selected papers to App.vue
-      this.$emit('process-papers', this.selectedPapers);
+      try {
+        this.isLoading = true;
+        console.log('Importing papers:', this.selectedPapers);
+        
+        const response = await fetch(API_ROUTES.PAPERS.IMPORT_BATCH, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ papers: this.selectedPapers })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || 'Failed to import papers');
+        }
+        
+        const result = await response.json();
+        console.log('Import result:', result);
+        
+        alert(`${result.imported_count || 0} paper(s) imported successfully.`);
+        
+        // Refresh imported papers to show real data
+        await this.fetchImportedPapers();
+        
+        // Clear selection
+        this.selectedPapers = [];
+        this.allSelected = false;
+      } catch (error) {
+        console.error('Error importing papers:', error);
+        alert('There was a problem importing the selected papers: ' + error.message);
+      } finally {
+        this.isLoading = false;
+      }
     },
     
-    viewDetails(paper) {
-      // View paper details (implement later)
-      console.log('View details:', paper);
-    } // Removed final comma as it's the last method
+    // Fetch imported papers
+    async fetchImportedPapers() {
+      try {
+        console.log('Fetching imported papers from:', API_ROUTES.PAPERS.LIST);
+        const response = await fetch(API_ROUTES.PAPERS.LIST);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || `Failed to fetch imported papers: ${response.status}`);
+        }
+        
+        this.importedPapers = await response.json();
+        console.log(`Fetched ${this.importedPapers.length} imported papers`);
+      } catch (error) {
+        console.error('Error fetching imported papers:', error);
+        // Don't use mock data - show empty state
+        this.importedPapers = [];
+      }
+    }
   }
 }
 </script>
@@ -882,26 +997,5 @@ export default {
   100% {
     transform: rotate(360deg);
   }
-}
-
-.line-clamp-1 {
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 </style>

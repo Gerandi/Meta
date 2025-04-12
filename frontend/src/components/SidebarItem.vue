@@ -1,8 +1,13 @@
 <template>
   <div 
-    class="flex items-center p-2 my-1 rounded cursor-pointer"
-    :class="active ? 'bg-indigo-700' : 'hover:bg-indigo-700'"
-    @click="$emit('click')"
+    class="flex items-center p-2 my-1 rounded"
+    :class="{
+      'bg-indigo-700': active,
+      'hover:bg-indigo-700': !disabled && !active,
+      'cursor-pointer': !disabled,
+      'opacity-50 cursor-default': disabled
+    }"
+    @click="!disabled && $emit('click')"
   >
     <div class="mr-3">
       <font-awesome-icon :icon="icon" size="sm" />
@@ -24,6 +29,10 @@ export default {
       required: true
     },
     active: {
+      type: Boolean,
+      default: false
+    },
+    disabled: {
       type: Boolean,
       default: false
     }
