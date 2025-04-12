@@ -1,34 +1,28 @@
 <template>
-  <div class="p-6 bg-gray-50">
-    <div class="max-w-6xl mx-auto">
-      <div class="mb-8">
-        <h1 class="text-2xl font-bold mb-6">Add Papers</h1>
+  <div class="p-6 bg-gray-100 min-h-screen">
+    <h1 class="text-2xl font-bold mb-6">Find & Import Papers</h1>
 
-        <!-- Tabs -->
-        <div class="bg-white rounded-lg shadow mb-6">
-          <div class="border-b px-6 py-4">
-            <div class="flex space-x-4">
-              <button 
-                class="py-2 px-4 font-medium flex items-center border-b-2 focus:outline-none"
-                :class="activeTab === 'search' ? 'text-indigo-600 border-indigo-600' : 'text-gray-600 border-transparent hover:text-indigo-600'"
-                @click="activeTab = 'search'"
-              >
-                <font-awesome-icon icon="search" class="mr-2" />
-                Search Databases
-              </button>
-              <button 
-                class="py-2 px-4 font-medium flex items-center border-b-2 focus:outline-none"
-                :class="activeTab === 'upload' ? 'text-indigo-600 border-indigo-600' : 'text-gray-600 border-transparent hover:text-indigo-600'"
-                @click="activeTab = 'upload'"
-              >
-                <font-awesome-icon icon="upload" class="mr-2" />
-                Upload PDFs
-              </button>
-            </div>
-          </div>
+    <div class="bg-white rounded-lg shadow mb-6">
+      <div class="flex border-b">
+        <button 
+          class="py-4 px-6 font-medium flex items-center"
+          :class="activeTab === 'search' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'"
+          @click="activeTab = 'search'"
+        >
+          <font-awesome-icon icon="search" class="mr-2" />
+          Search Databases
+        </button>
+        <button 
+          class="py-4 px-6 font-medium flex items-center"
+          :class="activeTab === 'upload' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'"
+          @click="activeTab = 'upload'"
+        >
+          <font-awesome-icon icon="upload" class="mr-2" />
+          Upload PDFs
+        </button>
+      </div>
 
-          <!-- Tab Content -->
-          <div class="p-6">
+      
             <SearchTab v-if="activeTab === 'search'" 
               :isLoading="isLoading"
               :searchQuery="searchQuery"
@@ -64,62 +58,63 @@
               @remove-from-queue="removeFromQueue"
               @process-uploads="processUploads"
             />
-          </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow">
+      <div class="p-4 border-b flex justify-between items-center">
+        <div class="font-medium">Imported Papers ({{ importedPapers.length || 0 }})</div>
+        <div class="flex items-center">
+          <button class="flex items-center px-3 py-2 text-sm border rounded-lg mr-2 hover:bg-gray-50">
+            <font-awesome-icon icon="filter" class="mr-1" /> Filter
+          </button>
+          <button 
+            class="flex items-center px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"
+            @click="showProjectModal = true"
+            :disabled="selectedImportedPapers.length === 0"
+          >
+            <font-awesome-icon icon="plus-circle" class="mr-1" /> Add to Project
+          </button>
         </div>
+      </div>
 
-        <!-- Imported Papers Section -->
-        <div class="bg-white rounded-lg shadow">
-          <div class="border-b px-6 py-4 flex justify-between items-center">
-            <h2 class="text-lg font-semibold">Imported Papers ({{ importedPapers.length || 0 }})</h2>
-
-            <div class="flex space-x-2">
-              <button class="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 flex items-center hover:bg-gray-50">
-                <font-awesome-icon icon="filter" class="mr-1.5" />
-                Filter
-              </button>
-              <button 
-                class="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 flex items-center hover:bg-gray-50"
-                @click="showProjectModal = true"
-                :disabled="selectedImportedPapers.length === 0"
-              >
-                <font-awesome-icon icon="plus-circle" class="mr-1.5" />
-                Add to Project
-              </button>
-            </div>
-          </div>
-
-          <!-- Imported Papers List -->
-          <div class="divide-y">
-            <ImportedPaperItem 
-              v-for="paper in importedPapers" 
-              :key="paper.id" 
-              :paper="paper"
-              :selected="isImportedSelected(paper.id)"
-              @toggle-selection="toggleImportedSelection(paper.id)"
-              @view="viewPaper(paper)"
-              @download="downloadPdf(paper)"
-              @remove="removePaper(paper.id)"
-            />
-            <div v-if="importedPapers.length === 0" class="p-10 text-center text-gray-500">
-              No papers imported yet. Use the tabs above to search or upload papers.
-            </div>
-          </div>
+      <div class="divide-y">
+        <div v-if="isLoading" class="text-center py-8">
+          <div class="spinner mb-4"></div>
+          <p class="text-gray-500">Loading papers...</p>
         </div>
+        
+        <template v-else>
+          <ImportedPaperItem 
+            v-for="paper in importedPapers" 
+            :key="paper.id" 
+            :paper="paper"
+            :selected="isImportedSelected(paper.id)"
+            @toggle-selection="toggleImportedSelection(paper.id)"
+            @view="viewPaper(paper)"
+            @download="downloadPdf(paper)"
+            @remove="removePaper(paper.id)"
+          />
+          <div v-if="importedPapers.length === 0" class="p-10 text-center text-gray-500 border-dashed border-gray-300">
+            <font-awesome-icon icon="file-pdf" class="text-gray-300 text-4xl mb-3" />
+            <p class="mb-2">No papers imported yet</p>
+            <p class="text-sm">Use the tabs above to search databases or upload PDFs</p>
+          </div>
+        </template>
       </div>
     </div>
 
     <!-- Project Select Modal -->
     <div v-if="showProjectModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div class="bg-white rounded-lg p-6 w-1/2 max-w-xl">
+      <div class="bg-white rounded-lg p-6 w-full max-w-xl shadow-xl">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-semibold">Add to Project</h2>
-          <button @click="showProjectModal = false" class="text-gray-500 hover:text-gray-700">
+          <h2 class="text-xl font-bold">Add to Project</h2>
+          <button @click="showProjectModal = false" class="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100">
             <font-awesome-icon icon="times" />
           </button>
         </div>
         
         <div class="mb-6">
-          <label class="block text-gray-700 mb-2">Select Project</label>
+          <label class="block text-gray-700 mb-2 font-medium">Select Project</label>
           <select 
             v-model="selectedProjectId"
             class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
@@ -131,15 +126,15 @@
           <div class="mt-4">
             <button 
               @click="showCreateProjectForm = !showCreateProjectForm"
-              class="text-indigo-600 text-sm flex items-center"
+              class="text-indigo-600 text-sm flex items-center hover:text-indigo-800"
             >
               <font-awesome-icon icon="plus" class="mr-1" /> Create New Project
             </button>
           </div>
           
-          <div v-if="showCreateProjectForm" class="mt-4 p-4 bg-gray-50 rounded-lg">
+          <div v-if="showCreateProjectForm" class="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Project Name*</label>
               <input 
                 v-model="newProject.name"
                 type="text" 

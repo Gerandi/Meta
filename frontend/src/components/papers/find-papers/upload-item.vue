@@ -1,45 +1,27 @@
 <template>
-  <div class="p-4 flex items-center hover:bg-gray-50">
-    <div class="flex-1">
-      <div class="flex justify-between items-center mb-2">
-        <div class="font-medium flex items-center">
-          <font-awesome-icon icon="file-pdf" class="text-red-500 mr-2" />
-          {{ item.name }}
-        </div>
-        <div class="text-sm text-gray-500">{{ formatFileSize(item.size) }}</div>
-      </div>
-      
-      <div v-if="item.status === 'uploading'" class="mb-1">
-        <div class="w-full bg-gray-200 rounded-full h-2">
-          <div 
-            class="h-2 rounded-full bg-indigo-600"
-            :style="{ width: `${item.progress}%` }"
-          ></div>
-        </div>
-      </div>
-      
-      <div class="flex justify-between items-center">
-        <div class="text-sm">
-          <span 
-            :class="{
-              'text-gray-500': item.status === 'queued',
-              'text-indigo-600': item.status === 'uploading',
-              'text-green-600': item.status === 'complete',
-              'text-red-600': item.status === 'error'
-            }"
-          >
-            {{ getStatusText() }}
-          </span>
-          <span v-if="item.error" class="text-red-600 ml-2">({{ item.error }})</span>
-        </div>
-        <button 
-          v-if="item.status !== 'uploading'"
-          class="text-gray-400 hover:text-red-600"
+  <div class="bg-white p-3 rounded border">
+    <div class="flex justify-between items-center mb-2">
+      <div class="font-medium">{{ item.name }}</div>
+      <div class="flex items-center">
+        <span class="text-sm text-gray-500 mr-2">{{ formatFileSize(item.size) }}</span>
+        <button v-if="item.status !== 'complete'" 
+          class="text-gray-400 hover:text-gray-600"
           @click="$emit('remove')"
         >
-          <font-awesome-icon icon="times" />
+          <font-awesome-icon icon="times" size="sm" />
         </button>
+        <font-awesome-icon v-else icon="check-circle" class="text-green-500" size="sm" />
       </div>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-2.5">
+      <div 
+        class="h-2.5 rounded-full" 
+        :class="item.status === 'complete' ? 'bg-green-500' : 'bg-indigo-600'"
+        :style="{ width: `${item.progress}%` }"
+      ></div>
+    </div>
+    <div class="text-xs text-gray-500 mt-1">
+      {{ item.status === 'complete' ? 'Complete' : item.status === 'uploading' ? `Uploading... ${item.progress}%` : 'Queued' }}
     </div>
   </div>
 </template>

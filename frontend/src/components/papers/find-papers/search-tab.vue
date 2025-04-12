@@ -1,23 +1,20 @@
 <template>
   <div>
-    <!-- Search Form -->
-    <div class="mb-6">
+    <div class="p-6">
       <div class="flex mb-4">
         <div class="relative flex-1 mr-4">
-          <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <font-awesome-icon icon="search" class="text-gray-400" />
-          </div>
+          <font-awesome-icon icon="search" class="absolute left-3 top-2.5 text-gray-400" />
           <input
             :value="searchQuery"
             @input="$emit('update:searchQuery', $event.target.value)"
             type="text"
-            placeholder="Search by title, author, keywords, DOI..."
+            placeholder="Search by title, author, keywords..."
             class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
             @keyup.enter="$emit('search')"
           />
         </div>
         <button
-          class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center"
+          class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
           @click="$emit('search')"
           :disabled="isLoading"
         >
@@ -26,19 +23,18 @@
         </button>
       </div>
 
-      <!-- Filters Panel -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        <!-- Database - OpenAlex Only -->
-        <div>
-          <div class="mb-2 text-sm font-medium">Database</div>
-          <div class="w-full border rounded-lg p-2 bg-gray-100 text-gray-700">
-            OpenAlex
-            <span class="text-xs text-gray-500 block mt-1">Comprehensive academic paper index</span>
-          </div>
+      <div class="flex flex-wrap -mx-2 mb-4">
+        <div class="px-2 w-1/4">
+          <div class="mb-2 text-sm font-medium">Databases</div>
+          <select class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+            <option>All Databases</option>
+            <option>PubMed</option>
+            <option>Crossref</option>
+            <option>Semantic Scholar</option>
+            <option>OpenAlex</option>
+          </select>
         </div>
-
-        <!-- Year Range -->
-        <div>
+        <div class="px-2 w-1/4">
           <div class="mb-2 text-sm font-medium">Year Range</div>
           <div class="flex">
             <input
@@ -57,9 +53,7 @@
             />
           </div>
         </div>
-
-        <!-- Study Type -->
-        <div>
+        <div class="px-2 w-1/4">
           <div class="mb-2 text-sm font-medium">Study Type</div>
           <select
             :value="filters.studyType"
@@ -73,9 +67,7 @@
             <option value="meta-analysis">Meta-Analysis</option>
           </select>
         </div>
-
-        <!-- Sort By -->
-        <div>
+        <div class="px-2 w-1/4">
           <div class="mb-2 text-sm font-medium">Sort By</div>
           <select
             :value="filters.sortBy"
@@ -90,16 +82,14 @@
         </div>
       </div>
 
-      <!-- Filter buttons -->
       <div class="flex justify-end">
-        <button
+        <button 
           class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
           @click="$emit('toggle-more-filters')"
         >
-          <font-awesome-icon :icon="showMoreFilters ? 'minus' : 'plus'" class="mr-1" />
-          {{ showMoreFilters ? 'Fewer Filters' : 'Advanced Filters' }}
+          <font-awesome-icon icon="filter" class="mr-1" /> Advanced Filters
         </button>
-        <button
+        <button 
           class="flex items-center text-gray-600 hover:text-gray-800"
           @click="$emit('clear-filters')"
         >
@@ -107,11 +97,11 @@
         </button>
       </div>
 
-      <!-- Advanced filters -->
+      <!-- Advanced filters section remains hidden but filter toggle button shows -->
       <div v-if="showMoreFilters" class="mt-4 pt-4 border-t">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <div class="mb-2 text-sm font-medium">Journal</div>
+            <div class="mb-2 text-sm font-medium text-gray-700">Journal</div>
             <input
               :value="filters.journal"
               @input="updateFilter('journal', $event.target.value)"
@@ -121,7 +111,7 @@
             />
           </div>
           <div>
-            <div class="mb-2 text-sm font-medium">Author</div>
+            <div class="mb-2 text-sm font-medium text-gray-700">Author</div>
             <input
               :value="filters.author"
               @input="updateFilter('author', $event.target.value)"
@@ -131,14 +121,14 @@
             />
           </div>
           <div>
-            <div class="mb-2 text-sm font-medium">Open Access Only</div>
+            <div class="mb-2 text-sm font-medium text-gray-700">Open Access Only</div>
             <div class="pt-2">
               <label class="inline-flex items-center">
                 <input
                   :checked="filters.openAccessOnly"
                   @change="updateFilter('openAccessOnly', $event.target.checked)"
                   type="checkbox"
-                  class="form-checkbox h-5 w-5 text-indigo-600"
+                  class="form-checkbox h-5 w-5 text-indigo-600 rounded border-gray-300"
                 />
                 <span class="ml-2 text-gray-700">Show only Open Access papers</span>
               </label>
@@ -148,71 +138,61 @@
       </div>
     </div>
 
-    <!-- Results counter and pagination -->
-    <div v-if="!isLoading && !error && results.length > 0" class="flex justify-between items-center mb-4">
-      <div class="font-medium">{{ totalResults }} Results</div>
+    <div class="border-t">
+      <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
+        <div class="font-medium">{{ totalResults }} Results</div>
+        <div class="flex items-center text-sm">
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <button 
+            class="ml-4 px-2 py-1 border rounded-md hover:bg-gray-100"
+            :disabled="currentPage === 1"
+            @click="$emit('prev-page')"
+          >Previous</button>
+          <button 
+            class="ml-2 px-2 py-1 border rounded-md hover:bg-gray-100"
+            :disabled="currentPage === totalPages"
+            @click="$emit('next-page')"
+          >Next</button>
+        </div>
+      </div>
+
       <div>
-        <span>Page {{ currentPage }} of {{ totalPages }}</span>
-        <button
-          class="ml-2 px-2 py-1 text-indigo-600 hover:text-indigo-800 disabled:opacity-50 disabled:text-gray-400"
-          :disabled="currentPage === 1"
-          @click="$emit('prev-page')"
-        >
-          Previous
-        </button>
-        <button
-          class="ml-2 px-2 py-1 text-indigo-600 hover:text-indigo-800 disabled:opacity-50 disabled:text-gray-400"
-          :disabled="currentPage === totalPages"
-          @click="$emit('next-page')"
-        >
-          Next
-        </button>
+        <!-- Loading state -->
+        <div v-if="isLoading" class="text-center py-12">
+          <div class="spinner mb-4"></div>
+          <p class="text-gray-500">Searching for papers...</p>
+        </div>
+
+        <!-- Error message -->
+        <div v-else-if="error" class="bg-red-50 border border-red-200 text-red-700 p-4 m-4">
+          <h3 class="font-medium mb-1 flex items-center">
+            <font-awesome-icon icon="exclamation-circle" class="mr-2" />
+            Error searching for papers
+          </h3>
+          <p>{{ error }}</p>
+        </div>
+
+        <!-- Results list -->
+        <div v-else>
+          <div v-for="paper in results" :key="paper.id || paper.doi || paper.title">
+            <SearchResultItem
+              :paper="paper"
+              :selected="isSelected(paper)"
+              @toggle-selection="$emit('toggle-selection', paper)"
+              @view="$emit('view-paper', paper)"
+              @download="$emit('download-pdf', paper)"
+              @add-to-project="$emit('add-to-project', paper)"
+              @view-details="$emit('view-details', paper)"
+            />
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Loading state -->
-    <div v-if="isLoading" class="text-center py-12">
-      <div class="spinner mb-4"></div>
-      <p class="text-gray-500">Searching for papers...</p>
-    </div>
-
-    <!-- Error message -->
-    <div v-else-if="error" class="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6">
-      <h3 class="font-medium mb-1">Error searching for papers</h3>
-      <p>{{ error }}</p>
-    </div>
-
-    <!-- Results list -->
-    <div v-else-if="results.length > 0" class="divide-y border rounded-lg bg-white overflow-hidden">
-      <!-- Select All checkbox -->
-      <div class="p-4 bg-gray-50 border-b">
-        <label class="inline-flex items-center">
-          <input 
-            type="checkbox" 
-            class="form-checkbox h-5 w-5 text-indigo-600"
-            :checked="allSelected"
-            @change="$emit('toggle-select-all')"
-          >
-          <span class="ml-2 text-gray-700">Select All ({{ results.length }} results)</span>
-        </label>
-      </div>
-      
-      <div v-for="paper in results" :key="paper.id || paper.doi || paper.title" class="p-5 hover:bg-gray-50">
-        <SearchResultItem
-          :paper="paper"
-          :selected="isSelected(paper)"
-          @toggle-selection="$emit('toggle-selection', paper)"
-          @view="$emit('view-paper', paper)"
-          @download="$emit('download-pdf', paper)"
-          @add-to-project="$emit('add-to-project', paper)"
-          @view-details="$emit('view-details', paper)"
-        />
-      </div>
-      
-      <!-- Empty results -->
-      <div v-if="results.length === 0 && !isLoading && !error" class="p-8 text-center">
-        <p class="text-gray-500">No results found. Try adjusting your search criteria.</p>
-      </div>
+    <!-- Empty results -->
+    <div v-if="results.length === 0 && !isLoading && !error" class="p-8 text-center">
+      <font-awesome-icon icon="search" class="text-gray-300 text-4xl mb-3" />
+      <p class="text-gray-500">No results found. Try adjusting your search criteria.</p>
     </div>
   </div>
 </template>
@@ -292,7 +272,7 @@ export default {
       this.searchUpdateTimeout = setTimeout(() => {
         console.log('Searching with updated filters');
         this.$emit('search');
-      }, 1000); // 1-second delay to avoid too many API calls
+      }, 800); // 800ms delay to avoid too many API calls
     },
     isSelected(paper) {
       return this.selectedPapers.some(p => this.isSamePaper(p, paper));

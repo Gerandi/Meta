@@ -1,53 +1,29 @@
 <template>
-  <div 
-    class="p-4 hover:bg-gray-50 flex items-center" 
-    :class="{ 'bg-indigo-50': selected }"
-  >
-    <div class="mr-3">
-      <input 
-        type="checkbox" 
-        class="form-checkbox h-5 w-5 text-indigo-600"
-        :checked="selected"
-        @change="$emit('toggle-selection')"
-        @click.stop="$emit('toggle-selection')"
-      />
+  <div class="p-4 hover:bg-gray-50 flex justify-between">
+    <div>
+      <div class="font-medium text-indigo-600 mb-1">{{ paper.title || 'Unknown Title' }}</div>
+      <div class="text-sm text-gray-700 mb-1">{{ formatAuthors(paper.authors) }}</div>
+      <div class="text-sm text-gray-500">{{ paper.journal || 'Unknown Journal' }} • {{ paper.year || 'Unknown Year' }}</div>
     </div>
-    <div class="flex-1">
-      <h3 class="font-medium text-gray-900 mb-1">{{ paper.title || 'Unknown Title' }}</h3>
-      <div class="text-sm text-gray-500 mb-1">{{ formatAuthors(paper.authors) }}</div>
-      <div class="text-sm text-gray-600">
-        {{ paper.journal || 'Unknown Journal' }} • {{ paper.year || 'Unknown Year' }}
-      </div>
-    </div>
-    
-    <div class="flex flex-col items-end ml-4">
-      <div class="mb-2">
-        <span 
-          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-          :class="getStatusClass(paper.status)"
-        >
-          {{ getStatusText(paper.status) }}
-        </span>
-      </div>
-      <div class="flex">
+    <div class="flex items-center">
+      <span 
+        class="text-xs px-2 py-1 rounded-full"
+        :class="paper.status === 'imported' || paper.status === 'complete' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'"
+      >
+        {{ paper.status === 'imported' || paper.status === 'complete' ? 'Imported' : 'Processing...' }}
+      </span>
+      <div class="ml-4 flex">
         <button 
-          class="text-indigo-600 hover:text-indigo-900 mr-3"
+          class="p-1 text-gray-400 hover:text-indigo-600 mr-1"
           @click="$emit('view')"
         >
-          <font-awesome-icon icon="eye" />
+          <font-awesome-icon icon="book" />
         </button>
         <button 
-          v-if="paper.doi || paper.pdf_url"
-          class="text-indigo-600 hover:text-indigo-900 mr-3"
-          @click="$emit('download')"
-        >
-          <font-awesome-icon icon="download" />
-        </button>
-        <button 
-          class="text-red-600 hover:text-red-900"
+          class="p-1 text-gray-400 hover:text-red-600"
           @click="$emit('remove')"
         >
-          <font-awesome-icon icon="trash" />
+          <font-awesome-icon icon="times" />
         </button>
       </div>
     </div>
@@ -111,6 +87,20 @@ export default {
       }
     },
     
+    getStatusIcon(status) {
+      switch (status) {
+        case 'imported':
+        case 'complete':
+          return 'check-circle';
+        case 'processing':
+          return 'spinner';
+        case 'error':
+          return 'exclamation-circle';
+        default:
+          return 'circle';
+      }
+    },
+    
     getStatusText(status) {
       switch (status) {
         case 'imported':
@@ -127,3 +117,12 @@ export default {
   }
 };
 </script>
+
+<style scoped>
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+</style>

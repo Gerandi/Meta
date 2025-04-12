@@ -1,53 +1,34 @@
 <template>
-  <div>
-    <!-- Upload Drop Zone -->
-    <div 
-      class="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center mb-6 hover:bg-gray-50 transition-colors"
-      @dragover.prevent
-      @drop.prevent="handleDrop"
-      @click="openFileDialog"
-    >
-      <div class="flex flex-col items-center">
-        <div 
-          class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4"
-        >
-          <font-awesome-icon icon="upload" class="text-indigo-600 text-2xl" />
-        </div>
-        <h3 class="text-lg font-medium mb-2">Drop PDF files here</h3>
-        <p class="text-gray-500 mb-4">or click to browse your computer</p>
-        <input 
-          ref="fileInput"
-          type="file" 
-          multiple
-          accept=".pdf"
-          class="hidden"
-          @change="handleFileSelection"
-        />
-        <button 
-          class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
-          @click.stop="openFileDialog"
-        >
-          Select Files
-        </button>
+  <div class="p-6">
+    <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6">
+      <div class="mx-auto w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
+        <font-awesome-icon icon="upload" class="text-indigo-600" size="2x" />
       </div>
+      <h3 class="text-lg font-medium mb-2">Drop PDF files here</h3>
+      <p class="text-gray-500 mb-4">or click to browse your computer</p>
+      <input 
+        ref="fileInput"
+        type="file" 
+        multiple
+        accept=".pdf"
+        class="hidden"
+        @change="handleFileSelection"
+      />
+      <button 
+        class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+        @click.stop="openFileDialog"
+        @dragover.prevent
+        @drop.prevent="handleDrop"
+      >
+        Select Files
+      </button>
     </div>
 
-    <!-- Upload Queue -->
-    <div v-if="uploadQueue.length > 0" class="mb-8">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-medium">Upload Queue ({{ uploadQueue.length }})</h3>
-        <button 
-          v-if="hasQueuedFiles"
-          class="px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center"
-          @click="$emit('process-uploads')"
-        >
-          <font-awesome-icon icon="upload" class="mr-1.5" /> Upload Files
-        </button>
-      </div>
-
-      <div class="divide-y border rounded-lg bg-white">
+    <div class="bg-gray-50 rounded-lg p-4 mb-6">
+      <h3 class="font-medium mb-2">Upload Queue ({{ uploadQueue.length || 3 }})</h3>
+      <div class="space-y-3">
         <UploadItem 
-          v-for="(item, index) in uploadQueue" 
+          v-for="(item, index) in uploadQueue.length ? uploadQueue : mockUploadItems" 
           :key="index"
           :item="item"
           @remove="$emit('remove-from-queue', index)"
@@ -55,45 +36,38 @@
       </div>
     </div>
 
-    <!-- Extraction Options -->
-    <div class="bg-white p-6 rounded-lg border mb-6">
-      <h3 class="text-lg font-medium mb-4">Extraction Options</h3>
-      
-      <div class="space-y-4">
-        <div>
-          <label class="flex items-center">
-            <input 
-              :checked="extractionOptions.extractMetadata"
-              @change="updateExtractionOption('extractMetadata', $event.target.checked)"
-              type="checkbox" 
-              class="form-checkbox h-5 w-5 text-indigo-600"
-            />
-            <span class="ml-2 text-gray-700">Automatically extract metadata (title, authors, journal, etc.)</span>
-          </label>
+    <div>
+      <h3 class="font-medium mb-2">Extraction Options</h3>
+      <div class="space-y-3">
+        <div class="flex items-center">
+          <input 
+            :checked="extractionOptions.extractMetadata"
+            @change="updateExtractionOption('extractMetadata', $event.target.checked)"
+            type="checkbox" 
+            id="extract-metadata"
+            class="mr-2"
+          />
+          <label for="extract-metadata">Automatically extract metadata (title, authors, journal, etc.)</label>
         </div>
-        
-        <div>
-          <label class="flex items-center">
-            <input 
-              :checked="extractionOptions.applyCodingSheet"
-              @change="updateExtractionOption('applyCodingSheet', $event.target.checked)"
-              type="checkbox" 
-              class="form-checkbox h-5 w-5 text-indigo-600"
-            />
-            <span class="ml-2 text-gray-700">Apply coding sheet for automated data extraction</span>
-          </label>
+        <div class="flex items-center">
+          <input 
+            :checked="extractionOptions.applyCodingSheet"
+            @change="updateExtractionOption('applyCodingSheet', $event.target.checked)"
+            type="checkbox" 
+            id="apply-coding"
+            class="mr-2"
+          />
+          <label for="apply-coding">Apply coding sheet for automated data extraction</label>
         </div>
-        
-        <div>
-          <label class="flex items-center">
-            <input 
-              :checked="extractionOptions.addToProject"
-              @change="updateExtractionOption('addToProject', $event.target.checked)"
-              type="checkbox" 
-              class="form-checkbox h-5 w-5 text-indigo-600"
-            />
-            <span class="ml-2 text-gray-700">Add to current project</span>
-          </label>
+        <div class="flex items-center">
+          <input 
+            :checked="extractionOptions.addToProject"
+            @change="updateExtractionOption('addToProject', $event.target.checked)"
+            type="checkbox" 
+            id="add-project"
+            class="mr-2"
+          />
+          <label for="add-project">Add to current project</label>
         </div>
       </div>
     </div>
@@ -107,6 +81,30 @@ export default {
   name: 'UploadTab',
   components: {
     UploadItem
+  },
+  data() {
+    return {
+      mockUploadItems: [
+        {
+          name: "Smith_et_al_2023_CBT_Meta_Analysis.pdf",
+          size: 2.4 * 1024 * 1024, // 2.4 MB
+          progress: 100,
+          status: "complete"
+        },
+        {
+          name: "Garcia_et_al_2022_Remote_Work.pdf",
+          size: 1.8 * 1024 * 1024, // 1.8 MB
+          progress: 65,
+          status: "uploading"
+        },
+        {
+          name: "Chen_et_al_2022_Vaccines.pdf",
+          size: 3.2 * 1024 * 1024, // 3.2 MB
+          progress: 0,
+          status: "queued"
+        }
+      ]
+    };
   },
   props: {
     uploadQueue: {

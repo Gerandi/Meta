@@ -1,70 +1,40 @@
 <template>
-  <div class="flex">
-    <div class="mr-3 pt-1">
-      <input
-        type="checkbox"
-        class="form-checkbox h-5 w-5 text-indigo-600"
-        :checked="selected"
-        @change="$emit('toggle-selection')"
-        @click.stop="$emit('toggle-selection')"
-      />
-    </div>
-    <div class="flex-1">
-      <div class="flex justify-between">
-        <h3 class="font-medium text-indigo-600 mb-1 line-clamp-2 text-lg">
-          {{ paper.title }}
-        </h3>
-        <div class="flex space-x-2 text-xs">
-          <span 
-            class="px-2 py-1 rounded-full"
-            :class="paper.open_access ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'"
-          >
-            {{ paper.open_access ? 'Open Access' : 'Subscription' }}
-          </span>
-          <span v-if="paper.source" class="px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-            {{ paper.source }}
-          </span>
+  <div class="p-4 border-b hover:bg-gray-50">
+    <div class="flex justify-between">
+      <div class="font-medium text-indigo-600 mb-1">{{ paper.title }}</div>
+      <div class="flex items-center">
+        <div class="text-xs px-2 py-1 rounded-full mr-2" :class="paper.open_access ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'">
+          {{ paper.open_access ? 'Open Access' : 'Subscription' }}
+        </div>
+        <div class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 flex items-center">
+          <font-awesome-icon icon="database" class="mr-1" size="xs" />
+          {{ paper.source || 'Unknown' }}
         </div>
       </div>
-      
-      <div class="text-sm text-gray-700 mb-1 line-clamp-1">
-        {{ formatAuthors(paper.authors) }}
-      </div>
-      
-      <div class="text-sm text-gray-500 mb-2 flex items-center">
-        <span class="truncate max-w-xs">{{ paper.journal || 'Unknown Journal' }}</span>
-        <span class="mx-1">•</span>
-        <span>{{ getYear(paper.publication_date) }}</span>
-        <span v-if="paper.citation_count" class="ml-2 text-xs font-medium">
-          <span class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">{{ paper.citation_count }} citations</span>
-        </span>
-      </div>
-      
-      <div class="text-sm text-gray-600 mb-3 line-clamp-3 max-h-24 overflow-hidden">
-        {{ paper.abstract }}
-      </div>
-      
-      <div class="flex mt-2 text-sm">
-        <button 
-          v-if="paper.doi || paper.open_access_url" 
-          class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
-          @click.stop="$emit('download')"
-        >
-          <font-awesome-icon icon="download" class="mr-1" /> Download PDF
-        </button>
-        <button 
-          class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
-          @click.stop="$emit('add-to-project')"
-        >
-          <font-awesome-icon icon="plus-circle" class="mr-1" /> Import
-        </button>
-        <button 
-          class="flex items-center text-indigo-600 hover:text-indigo-800"
-          @click.stop="$emit('view-details')"
-        >
-          <font-awesome-icon icon="book" class="mr-1" /> View Details
-        </button>
-      </div>
+    </div>
+    <div class="text-sm text-gray-700 mb-1">{{ formatAuthors(paper.authors) }}</div>
+    <div class="text-sm text-gray-500 mb-2">{{ paper.journal || 'Unknown Journal' }} • {{ getYear(paper.publication_date) }}</div>
+    <div class="text-sm text-gray-600 mb-3">{{ paper.abstract || 'No abstract available for this paper.' }}</div>
+    <div class="flex">
+      <button 
+        v-if="paper.doi || paper.open_access_url" 
+        class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
+        @click.stop="$emit('download')"
+      >
+        <font-awesome-icon icon="download" class="mr-1" /> Download PDF
+      </button>
+      <button 
+        class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
+        @click.stop="$emit('add-to-project')"
+      >
+        <font-awesome-icon icon="plus-circle" class="mr-1" /> Import
+      </button>
+      <button 
+        class="flex items-center text-indigo-600 hover:text-indigo-800"
+        @click.stop="$emit('view-details')"
+      >
+        <font-awesome-icon icon="book" class="mr-1" /> View Details
+      </button>
     </div>
   </div>
 </template>
