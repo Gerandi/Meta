@@ -73,7 +73,7 @@
           class="text-indigo-600 hover:text-indigo-800"
           @click="showCreateForm = true"
         >
-          <font-awesome-icon icon="plus" class="mr-1" /> New Project
+          <Plus class="mr-1" size="16" /> New Project
         </button>
         <div v-else></div>
         
@@ -99,9 +99,13 @@
 
 <script>
 import { API_ROUTES } from '../config.js';
+import { Plus } from 'lucide-vue-next';
 
 export default {
   name: 'ProjectSelectModal',
+  components: {
+    Plus
+  },
   props: {
     show: {
       type: Boolean,

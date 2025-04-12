@@ -28,7 +28,7 @@
           class="mt-4 flex items-center text-indigo-600 hover:text-indigo-800"
           @click="createProject"
         >
-          <font-awesome-icon icon="plus-circle" class="mr-1" /> New Project
+          <PlusCircle class="mr-1" size="18" /> New Project
         </button>
       </div>
       
@@ -36,25 +36,25 @@
         <h2 class="text-lg font-semibold mb-4">Quick Actions</h2>
         <div class="grid grid-cols-2 gap-4">
           <ActionCard 
-            icon="search" 
+            icon="Search" 
             title="Find Papers" 
             description="Search databases for relevant papers" 
             @click="$emit('change-view', 'search')"
           />
           <ActionCard 
-            icon="upload" 
+            icon="Upload" 
             title="Import PDFs" 
             description="Upload PDFs from your computer" 
             @click="importPdfs"
           />
           <ActionCard 
-            icon="edit" 
+            icon="PenLine" 
             title="Edit Coding Sheet" 
             description="Configure your data extraction variables" 
             @click="$emit('change-view', 'codingSheet')"
           />
           <ActionCard 
-            icon="table" 
+            icon="Table" 
             title="View Results" 
             description="See your extracted data" 
             @click="$emit('change-view', 'resultsTable')"
@@ -108,6 +108,7 @@ import StatCard from './StatCard.vue';
 import ProjectItem from './ProjectItem.vue';
 import ActionCard from './ActionCard.vue';
 import { API_ROUTES } from '../config.js';
+import { PlusCircle } from 'lucide-vue-next';
 
 // Define the ActivityItem component
 const ActivityItem = {
@@ -222,7 +223,8 @@ export default {
     ActionCard,
     ActivityItem,
     ProgressItem,
-    StepItem
+    StepItem,
+    PlusCircle
   },
   props: {
     activeProject: {

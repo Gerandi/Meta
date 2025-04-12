@@ -7,7 +7,7 @@
           {{ paper.open_access ? 'Open Access' : 'Subscription' }}
         </div>
         <div class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 flex items-center">
-          <font-awesome-icon icon="database" class="mr-1" size="xs" />
+          <Database class="mr-1" size="12" />
           {{ paper.source || 'Unknown' }}
         </div>
       </div>
@@ -21,27 +21,35 @@
         class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
         @click.stop="$emit('download')"
       >
-        <font-awesome-icon icon="download" class="mr-1" /> Download PDF
+        <Download class="mr-1" size="16" /> Download PDF
       </button>
       <button 
         class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
         @click.stop="$emit('add-to-project')"
       >
-        <font-awesome-icon icon="plus-circle" class="mr-1" /> Import
+        <PlusCircle class="mr-1" size="16" /> Import
       </button>
       <button 
         class="flex items-center text-indigo-600 hover:text-indigo-800"
         @click.stop="$emit('view-details')"
       >
-        <font-awesome-icon icon="book" class="mr-1" /> View Details
+        <Book class="mr-1" size="16" /> View Details
       </button>
     </div>
   </div>
 </template>
 
 <script>
+import { Database, Download, PlusCircle, Book } from 'lucide-vue-next';
+
 export default {
   name: 'SearchResultItem',
+  components: {
+    Database,
+    Download,
+    PlusCircle,
+    Book
+  },
   props: {
     paper: {
       type: Object,

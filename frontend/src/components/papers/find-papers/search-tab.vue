@@ -3,7 +3,7 @@
     <div class="p-6">
       <div class="flex mb-4">
         <div class="relative flex-1 mr-4">
-          <font-awesome-icon icon="search" class="absolute left-3 top-2.5 text-gray-400" />
+          <Search class="absolute left-3 top-2.5 text-gray-400" size="18" />
           <input
             :value="searchQuery"
             @input="$emit('update:searchQuery', $event.target.value)"
@@ -87,7 +87,7 @@
           class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
           @click="$emit('toggle-more-filters')"
         >
-          <font-awesome-icon icon="filter" class="mr-1" /> Advanced Filters
+          <FilterIcon class="mr-1" size="16" /> Advanced Filters
         </button>
         <button 
           class="flex items-center text-gray-600 hover:text-gray-800"
@@ -166,7 +166,7 @@
         <!-- Error message -->
         <div v-else-if="error" class="bg-red-50 border border-red-200 text-red-700 p-4 m-4">
           <h3 class="font-medium mb-1 flex items-center">
-            <font-awesome-icon icon="exclamation-circle" class="mr-2" />
+            <AlertCircle class="mr-2" size="18" />
             Error searching for papers
           </h3>
           <p>{{ error }}</p>
@@ -191,7 +191,7 @@
 
     <!-- Empty results -->
     <div v-if="results.length === 0 && !isLoading && !error" class="p-8 text-center">
-      <font-awesome-icon icon="search" class="text-gray-300 text-4xl mb-3" />
+      <Search class="text-gray-300 mx-auto mb-3" size="40" />
       <p class="text-gray-500">No results found. Try adjusting your search criteria.</p>
     </div>
   </div>
@@ -199,11 +199,15 @@
 
 <script>
 import SearchResultItem from './search-result-item.vue';
+import { Search, AlertCircle, Filter as FilterIcon } from 'lucide-vue-next';
 
 export default {
   name: 'SearchTab',
   components: {
-    SearchResultItem
+    SearchResultItem,
+    Search,
+    AlertCircle,
+    FilterIcon
   },
   data() {
     return {

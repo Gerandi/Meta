@@ -8,9 +8,9 @@
           class="text-gray-400 hover:text-gray-600"
           @click="$emit('remove')"
         >
-          <font-awesome-icon icon="times" size="sm" />
+          <X size="16" />
         </button>
-        <font-awesome-icon v-else icon="check-circle" class="text-green-500" size="sm" />
+        <CheckCircle v-else class="text-green-500" size="16" />
       </div>
     </div>
     <div class="w-full bg-gray-200 rounded-full h-2.5">
@@ -27,8 +27,14 @@
 </template>
 
 <script>
+import { X, CheckCircle } from 'lucide-vue-next';
+
 export default {
   name: 'UploadItem',
+  components: {
+    X,
+    CheckCircle
+  },
   props: {
     item: {
       type: Object,

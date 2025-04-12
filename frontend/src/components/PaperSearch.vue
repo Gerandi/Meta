@@ -9,7 +9,7 @@
           :class="activeTab === 'search' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'"
           @click="activeTab = 'search'"
         >
-          <font-awesome-icon icon="search" class="mr-2" />
+          <Search class="mr-2" size="18" />
           Search Databases
         </button>
         <button 
@@ -17,7 +17,7 @@
           :class="activeTab === 'upload' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'"
           @click="activeTab = 'upload'"
         >
-          <font-awesome-icon icon="upload" class="mr-2" />
+          <Upload class="mr-2" size="18" />
           Upload PDFs
         </button>
       </div>
@@ -65,14 +65,14 @@
         <div class="font-medium">Imported Papers ({{ importedPapers.length || 0 }})</div>
         <div class="flex items-center">
           <button class="flex items-center px-3 py-2 text-sm border rounded-lg mr-2 hover:bg-gray-50">
-            <font-awesome-icon icon="filter" class="mr-1" /> Filter
+            <Filter class="mr-1" size="16" /> Filter
           </button>
           <button 
             class="flex items-center px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"
             @click="showProjectModal = true"
             :disabled="selectedImportedPapers.length === 0"
           >
-            <font-awesome-icon icon="plus-circle" class="mr-1" /> Add to Project
+            <PlusCircle class="mr-1" size="16" /> Add to Project
           </button>
         </div>
       </div>
@@ -95,7 +95,7 @@
             @remove="removePaper(paper.id)"
           />
           <div v-if="importedPapers.length === 0" class="p-10 text-center text-gray-500 border-dashed border-gray-300">
-            <font-awesome-icon icon="file-pdf" class="text-gray-300 text-4xl mb-3" />
+            <FileText class="text-gray-300 mx-auto mb-3" size="40" />
             <p class="mb-2">No papers imported yet</p>
             <p class="text-sm">Use the tabs above to search databases or upload PDFs</p>
           </div>
@@ -109,7 +109,7 @@
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-bold">Add to Project</h2>
           <button @click="showProjectModal = false" class="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100">
-            <font-awesome-icon icon="times" />
+            <X size="18" />
           </button>
         </div>
         
@@ -128,7 +128,7 @@
               @click="showCreateProjectForm = !showCreateProjectForm"
               class="text-indigo-600 text-sm flex items-center hover:text-indigo-800"
             >
-              <font-awesome-icon icon="plus" class="mr-1" /> Create New Project
+              <Plus class="mr-1" size="16" /> Create New Project
             </button>
           </div>
           
@@ -188,13 +188,29 @@ import SearchTab from './papers/find-papers/search-tab.vue';
 import UploadTab from './papers/find-papers/upload-tab.vue';
 import ImportedPaperItem from './papers/find-papers/imported-paper-item.vue';
 import { API_ROUTES, APP_CONFIG } from '../config.js';
+import { 
+  Search, 
+  Upload, 
+  Filter, 
+  PlusCircle, 
+  FileText, 
+  X, 
+  Plus 
+} from 'lucide-vue-next';
 
 export default {
   name: 'PaperSearch',
   components: {
     SearchTab,
     UploadTab,
-    ImportedPaperItem
+    ImportedPaperItem,
+    Search,
+    Upload,
+    Filter,
+    PlusCircle,
+    FileText,
+    X,
+    Plus
   },
   data() {
     return {

@@ -73,7 +73,7 @@ const Sidebar = ({ activeView, setActiveView }) => {
           onClick={() => {}} 
         />
       </nav>
-      <div className="mt-auto pt-4 border-t border-indigo-700 mt-8">
+      <div className="mt-auto pt-4 border-t border-indigo-700">
         <div className="flex items-center p-2 rounded hover:bg-indigo-700 cursor-pointer">
           <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center mr-2">
             JD

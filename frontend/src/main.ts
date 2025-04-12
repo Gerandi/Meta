@@ -2,73 +2,70 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import './style.css'
 
-// Import FontAwesome core
-import { library } from '@fortawesome/fontawesome-svg-core'
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-
-// Import icons individually
+// Import Lucide Vue
 import { 
-  faSearch, 
-  faUpload, 
-  faPlusCircle, 
-  faFilter, 
-  faDownload, 
-  faBook, 
-  faFileAlt, 
-  faThLarge, 
-  faEdit, 
-  faTable, 
-  faCog, 
-  faTrash, 
-  faSave, 
-  faCheck, 
-  faTimes, 
-  faPlus, 
-  faMinus,
-  faFolder,
-  faFolderOpen,
-  faEllipsisV,
-  faArrowLeft,
-  faFileUpload,
-  faExchangeAlt,
-  faArrowRight,
-  faTasks
-} from '@fortawesome/free-solid-svg-icons'
-
-// Add icons to the library
-library.add(
-  faSearch, 
-  faUpload, 
-  faPlusCircle, 
-  faFilter, 
-  faDownload, 
-  faBook, 
-  faFileAlt, 
-  faThLarge, 
-  faEdit, 
-  faTable, 
-  faCog, 
-  faTrash, 
-  faSave, 
-  faCheck, 
-  faTimes, 
-  faPlus, 
-  faMinus,
-  faFolder,
-  faFolderOpen,
-  faEllipsisV,
-  faArrowLeft,
-  faFileUpload,
-  faExchangeAlt,
-  faArrowRight,
-  faTasks
-)
+  Search,
+  Upload,
+  PlusCircle,
+  Filter,
+  Download,
+  Book,
+  FileText,
+  LayoutGrid,
+  Edit,
+  Table,
+  Settings,
+  Trash2,
+  Save,
+  Check,
+  X,
+  Plus,
+  Minus,
+  Folder,
+  FolderOpen,
+  MoreVertical,
+  ArrowLeft,
+  FileUp,
+  ArrowUpDown,
+  ArrowRight,
+  ClipboardList,
+  Grid,
+  Edit3,
+  PenLine
+} from 'lucide-vue-next'
 
 // Create Vue app
 const app = createApp(App)
 
-// Register FontAwesome component
-app.component('font-awesome-icon', FontAwesomeIcon)
+// Register Lucide icons globally
+app.component('Search', Search)
+app.component('Upload', Upload)
+app.component('PlusCircle', PlusCircle)
+app.component('Filter', Filter)
+app.component('Download', Download)
+app.component('Book', Book)
+app.component('FileText', FileText)
+app.component('LayoutGrid', LayoutGrid)
+app.component('Edit', Edit)
+app.component('Table', Table)
+app.component('Settings', Settings)
+app.component('Trash2', Trash2)
+app.component('Save', Save)
+app.component('Check', Check)
+app.component('X', X)
+app.component('Plus', Plus)
+app.component('Minus', Minus)
+app.component('Folder', Folder)
+app.component('FolderOpen', FolderOpen)
+app.component('MoreVertical', MoreVertical)
+app.component('ArrowLeft', ArrowLeft)
+app.component('FileUp', FileUp)
+app.component('ArrowUpDown', ArrowUpDown)
+app.component('ArrowRight', ArrowRight)
+app.component('ClipboardList', ClipboardList)
+app.component('Grid', Grid)
+app.component('Edit3', Edit3)
+app.component('PenLine', PenLine)
 
 // Mount app
 app.mount('#app')

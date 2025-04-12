@@ -7,7 +7,7 @@
         class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
         @click="showCreateModal = true"
       >
-        <font-awesome-icon icon="plus" class="mr-2" /> Create New Project
+        <Plus class="mr-2 inline" size="18" /> Create New Project
       </button>
     </div>
     
@@ -22,7 +22,7 @@
     </div>
     
     <div v-else-if="projects.length === 0" class="bg-white rounded-lg p-8 text-center shadow">
-      <font-awesome-icon icon="folder-open" class="text-gray-400 text-5xl mb-4" />
+      <FolderOpen class="text-gray-400 mx-auto" size="48" />
       <h3 class="text-xl font-medium mb-2">No Projects Yet</h3>
       <p class="text-gray-600 mb-4">Create your first project to organize your papers.</p>
       <button 
@@ -44,7 +44,7 @@
             <h3 class="text-xl font-semibold mb-2">{{ project.name }}</h3>
             <div class="dropdown relative">
               <button class="text-gray-500 hover:text-gray-700 p-1" @click.stop="toggleDropdown($event)">
-                <font-awesome-icon icon="ellipsis-v" />
+                <MoreVertical size="18" />
               </button>
               <div class="dropdown-menu absolute right-0 mt-1 bg-white rounded-lg shadow-lg p-2 z-50 border">
                 <button 
@@ -134,9 +134,15 @@
 
 <script>
 import { API_ROUTES } from '../config.js';
+import { Plus, FolderOpen, MoreVertical } from 'lucide-vue-next';
 
 export default {
   name: 'Projects',
+  components: {
+    Plus,
+    FolderOpen,
+    MoreVertical
+  },
   emits: ['view-project', 'set-active-project', 'clear-active-project', 'request-confirmation', 'project-list-changed'],
   data() {
     return {

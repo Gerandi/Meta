@@ -11,7 +11,7 @@
           @click="continueToProcessing"
           :disabled="importedPapers.length === 0"
         >
-          <font-awesome-icon icon="arrow-right" class="mr-1" /> Continue to Processing
+          <ArrowRight class="mr-1" size="18" /> Continue to Processing
         </button>
       </div>
     </div>
@@ -19,7 +19,7 @@
     <div class="bg-white rounded-lg shadow-lg mb-6 p-6">
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex">
         <div class="text-blue-500 mr-3 mt-0.5">
-          <font-awesome-icon icon="info-circle" size="lg"/>
+          <Info size="24" />
         </div>
         <div>
           <h3 class="font-medium text-blue-800 mb-1">Import Your Papers</h3>
@@ -33,7 +33,7 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div class="bg-white rounded-lg border p-6 text-center hover:shadow-md transition-shadow">
           <div class="inline-flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 text-indigo-600 mb-4">
-            <font-awesome-icon icon="file-upload" size="lg" />
+            <UploadCloud size="24" />
           </div>
           <h3 class="text-lg font-medium mb-2">PDF Uploads</h3>
           <p class="text-gray-600 text-sm mb-4">
@@ -57,7 +57,7 @@
         
         <div class="bg-white rounded-lg border p-6 text-center hover:shadow-md transition-shadow">
           <div class="inline-flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 text-indigo-600 mb-4">
-            <font-awesome-icon icon="file-import" size="lg" />
+            <Import size="24" />
           </div>
           <h3 class="text-lg font-medium mb-2">Bulk Import</h3>
           <p class="text-gray-600 text-sm mb-4">
@@ -73,7 +73,7 @@
         
         <div class="bg-white rounded-lg border p-6 text-center hover:shadow-md transition-shadow">
           <div class="inline-flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 text-indigo-600 mb-4">
-            <font-awesome-icon icon="clipboard-list" size="lg" />
+            <ClipboardList size="24" />
           </div>
           <h3 class="text-lg font-medium mb-2">Manual Entry</h3>
           <p class="text-gray-600 text-sm mb-4">
@@ -98,7 +98,7 @@
         >
           <div class="flex justify-between items-center mb-2">
             <div class="font-medium flex items-center">
-              <font-awesome-icon icon="file-pdf" class="text-gray-500 mr-2" />
+              <FileText class="text-gray-500 mr-2" size="18" />
               {{ file.name }}
             </div>
             <div class="text-sm text-gray-500">{{ formatFileSize(file.size) }}</div>
@@ -132,7 +132,7 @@
               @click="removeSelectedPapers"
               :disabled="selectedPaperIds.length === 0"
             >
-              <font-awesome-icon icon="trash" class="mr-1" /> Remove Selected
+              <Trash class="mr-1" size="16" /> Remove Selected
             </button>
           </div>
         </div>
@@ -181,7 +181,7 @@
                   <div class="font-medium text-gray-900">{{ paper.title || 'Unknown Title' }}</div>
                   <div class="text-sm text-gray-500">{{ formatAuthors(paper.authors) }}</div>
                   <div v-if="paper.needsReview" class="mt-1 text-xs text-yellow-600">
-                    <font-awesome-icon icon="exclamation-triangle" class="mr-1" /> Needs review
+                    <AlertTriangle class="inline mr-1" size="14" /> Needs review
                   </div>
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap">
@@ -219,7 +219,7 @@
       </div>
       
       <div v-else-if="!isUploading" class="text-center py-8">
-        <font-awesome-icon icon="file-pdf" class="text-gray-400 text-5xl mb-4" />
+        <FileText class="text-gray-400 mx-auto mb-4" size="48" />
         <h3 class="text-xl font-medium mb-2">No Papers Imported Yet</h3>
         <p class="text-gray-600 mb-4">Upload PDF files to get started</p>
       </div>
@@ -234,13 +234,13 @@
             class="text-gray-400 hover:text-gray-600"
             @click="showBulkImportModal = false"
           >
-            <font-awesome-icon icon="times" />
+            <X size="18" />
           </button>
         </div>
         
         <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6">
           <div class="mx-auto w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
-            <font-awesome-icon icon="file-upload" class="text-indigo-600 text-2xl" />
+            <UploadCloud class="text-indigo-600" size="32" />
           </div>
           <h3 class="text-lg font-medium mb-2">Drop PDF files here</h3>
           <p class="text-gray-500 mb-4">or select multiple files from your computer</p>
@@ -283,7 +283,7 @@
             class="text-gray-400 hover:text-gray-600"
             @click="showManualEntryModal = false"
           >
-            <font-awesome-icon icon="times" />
+            <X size="18" />
           </button>
         </div>
         
@@ -376,7 +376,7 @@
             class="text-gray-400 hover:text-gray-600"
             @click="showEditModal = false"
           >
-            <font-awesome-icon icon="times" />
+            <X size="18" />
           </button>
         </div>
         
@@ -423,3 +423,176 @@
             v-model="editingPaper.doi"
             type="text" 
             class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+          />
+        </div>
+        
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Abstract</label>
+          <textarea 
+            v-model="editingPaper.abstract"
+            class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+            rows="4"
+          ></textarea>
+        </div>
+        
+        <div class="flex justify-end">
+          <button 
+            class="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-100 mr-2"
+            @click="showEditModal = false"
+          >
+            Cancel
+          </button>
+          <button 
+            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            @click="updatePaper"
+            :disabled="!editingPaper.title || !editingPaper.authors"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { API_ROUTES } from '../config.js';
+import { 
+  ArrowRight, 
+  Info, 
+  UploadCloud, 
+  Import, 
+  ClipboardList, 
+  FileText, 
+  Trash, 
+  AlertTriangle,
+  X
+} from 'lucide-vue-next';
+
+export default {
+  name: 'ImportPapers',
+  components: {
+    ArrowRight,
+    Info,
+    UploadCloud,
+    Import,
+    ClipboardList,
+    FileText,
+    Trash,
+    AlertTriangle,
+    X
+  },
+  props: {
+    activeProject: {
+      type: Object,
+      default: null
+    }
+  },
+  data() {
+    return {
+      isUploading: false,
+      extractingMetadata: false,
+      uploadingFiles: [],
+      importedPapers: [],
+      selectedPaperIds: [],
+      showBulkImportModal: false,
+      showManualEntryModal: false,
+      showEditModal: false,
+      manualPaper: {
+        title: '',
+        authors: '',
+        journal: '',
+        year: '',
+        doi: '',
+        abstract: ''
+      },
+      editingPaper: null
+    };
+  },
+  computed: {
+    isAllSelected() {
+      return this.importedPapers.length > 0 && this.selectedPaperIds.length === this.importedPapers.length;
+    }
+  },
+  methods: {
+    continueToProcessing() {
+      // Continue to processing logic
+    },
+    handleFileUpload(event) {
+      // Handle file upload logic
+    },
+    openBulkImportModal() {
+      this.showBulkImportModal = true;
+    },
+    handleBulkFileUpload(event) {
+      // Handle bulk file upload logic
+    },
+    openManualEntryModal() {
+      this.showManualEntryModal = true;
+    },
+    addManualPaper() {
+      // Add manual paper logic
+    },
+    editPaper(paper) {
+      this.editingPaper = { ...paper };
+      this.showEditModal = true;
+    },
+    updatePaper() {
+      // Update paper logic
+    },
+    removePaper(paperId) {
+      // Remove paper logic
+    },
+    removeSelectedPapers() {
+      // Remove selected papers logic
+    },
+    toggleSelectAll() {
+      if (this.isAllSelected) {
+        this.selectedPaperIds = [];
+      } else {
+        this.selectedPaperIds = this.importedPapers.map(paper => paper.id);
+      }
+    },
+    togglePaperSelection(paperId) {
+      const index = this.selectedPaperIds.indexOf(paperId);
+      if (index > -1) {
+        this.selectedPaperIds.splice(index, 1);
+      } else {
+        this.selectedPaperIds.push(paperId);
+      }
+    },
+    isSelected(paperId) {
+      return this.selectedPaperIds.includes(paperId);
+    },
+    formatFileSize(size) {
+      // Format file size logic
+    },
+    formatAuthors(authors) {
+      // Format authors logic
+    },
+    getStatusClass(status) {
+      // Get status class logic
+    },
+    getStatusText(status) {
+      // Get status text logic
+    }
+  }
+};
+</script>
+
+<style scoped>
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-left-color: #6366f1;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+</style>

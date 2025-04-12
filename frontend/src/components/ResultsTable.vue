@@ -4,10 +4,10 @@
       <h1 class="text-2xl font-bold">Results Table</h1>
       <div class="flex">
         <button class="flex items-center px-3 py-2 rounded-lg border bg-white mr-2 hover:bg-gray-50">
-          <font-awesome-icon icon="filter" class="mr-1" /> Filter
+          <Filter class="mr-1" size="16" /> Filter
         </button>
         <button class="flex items-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">
-          <font-awesome-icon icon="download" class="mr-1" /> Export
+          <Download class="mr-1" size="16" /> Export
         </button>
       </div>
     </div>
@@ -24,7 +24,7 @@
     
     <div v-else-if="papers.length === 0" class="bg-white rounded-lg shadow p-8 text-center">
       <div class="mb-4 text-gray-400">
-        <font-awesome-icon icon="table" size="4x" />
+        <Table class="mx-auto" size="64" />
       </div>
       <h2 class="text-xl font-medium mb-2">No Results Yet</h2>
       <p class="text-gray-500 mb-4">Start by searching for papers and coding them.</p>
@@ -101,9 +101,15 @@
 
 <script>
 import { API_ROUTES } from '../config.js';
+import { Filter, Download, Table } from 'lucide-vue-next';
 
 export default {
   name: 'ResultsTable',
+  components: {
+    Filter,
+    Download,
+    Table
+  },
   props: {
     projectId: {
       type: Number,

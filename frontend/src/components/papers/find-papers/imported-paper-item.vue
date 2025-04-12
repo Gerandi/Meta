@@ -17,13 +17,13 @@
           class="p-1 text-gray-400 hover:text-indigo-600 mr-1"
           @click="$emit('view')"
         >
-          <font-awesome-icon icon="book" />
+          <Book size="18" />
         </button>
         <button 
           class="p-1 text-gray-400 hover:text-red-600"
           @click="$emit('remove')"
         >
-          <font-awesome-icon icon="times" />
+          <X size="18" />
         </button>
       </div>
     </div>
@@ -31,8 +31,14 @@
 </template>
 
 <script>
+import { Book, X } from 'lucide-vue-next';
+
 export default {
   name: 'ImportedPaperItem',
+  components: {
+    Book,
+    X
+  },
   props: {
     paper: {
       type: Object,

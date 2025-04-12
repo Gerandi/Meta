@@ -4,7 +4,7 @@
     @click="$emit('click')"
   >
     <div class="text-indigo-600 mb-2">
-      <font-awesome-icon :icon="icon" size="lg" />
+      <component :is="icon" size="24" />
     </div>
     <div class="font-medium mb-1">{{ title }}</div>
     <div class="text-sm text-gray-500">{{ description }}</div>

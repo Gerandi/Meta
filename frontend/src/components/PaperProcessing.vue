@@ -8,11 +8,11 @@
       <div class="flex">
         <button class="px-4 py-2 border bg-white text-gray-700 hover:bg-gray-50 rounded-lg mr-2 flex items-center"
         @click="toggleFilters">
-          <font-awesome-icon icon="filter" class="mr-1" /> Filter
+          <Filter class="mr-1" size="16" /> Filter
         </button>
         <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center"
           @click="goToCoding">
-          <font-awesome-icon icon="check-circle" class="mr-1" /> Continue to Coding
+          <CheckCircle class="mr-1" size="16" /> Continue to Coding
         </button>
       </div>
     </div>
@@ -36,7 +36,7 @@
       <div v-if="activeTab === 'cleanup'" class="p-6">
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex">
           <div class="text-blue-500 mr-3 mt-0.5">
-            <font-awesome-icon icon="question-circle" size="lg"/>
+            <HelpCircle size="24" />
           </div>
           <div>
             <h3 class="font-medium text-blue-800 mb-1">Paper Collection Clean-up</h3>
@@ -50,7 +50,7 @@
         <div class="flex justify-between items-center mb-4">
           <div class="flex">
             <div class="relative mr-2">
-              <font-awesome-icon icon="search" class="absolute left-3 top-2.5 text-gray-400" />
+              <Search class="absolute left-3 top-2.5 text-gray-400" size="18" />
               <input 
                 v-model="searchQuery"
                 type="text" 
@@ -76,8 +76,8 @@
               @click="findDuplicates"
               :disabled="isLoading"
             >
-              <font-awesome-icon icon="sync" class="mr-1" spin v-if="isLoading"/> 
-              <font-awesome-icon icon="rotate-right" class="mr-1" v-else/> 
+              <RefreshCw class="mr-1" size="16" v-if="isLoading" /> 
+              <RotateCw class="mr-1" size="16" v-else /> 
               Find Duplicates
             </button>
             <button 
@@ -85,13 +85,13 @@
               @click="removeSelectedPapers"
               :disabled="selectedPapers.length === 0"
             >
-              <font-awesome-icon icon="trash" class="mr-1" /> Remove Selected
+              <Trash2 class="mr-1" size="16" /> Remove Selected
             </button>
             <button 
               class="px-3 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 flex items-center text-sm"
               @click="exportPaperList"
             >
-              <font-awesome-icon icon="download" class="mr-1" /> Export List
+              <Download class="mr-1" size="16" /> Export List
             </button>
           </div>
         </div>
@@ -131,7 +131,7 @@
         </div>
         
         <div v-else-if="papers.length === 0" class="text-center py-12">
-          <font-awesome-icon icon="folder-open" class="text-gray-400 text-5xl mb-4" />
+          <FolderOpen class="text-gray-400 mx-auto mb-4" size="48" />
           <h3 class="text-xl font-medium mb-2">No Papers Found</h3>
           <p class="text-gray-600 mb-4">Try adjusting your filters or search terms.</p>
         </div>
@@ -185,27 +185,27 @@
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm">
                   <div v-if="paper.pdfStatus === 'available'" class="flex items-center text-green-600">
-                    <font-awesome-icon icon="check-circle" class="mr-1" /> Available
+                    <CheckCircle class="mr-1" size="16" /> Available
                   </div>
                   <div v-else-if="paper.pdfStatus === 'missing'" class="flex items-center text-orange-500">
-                    <font-awesome-icon icon="exclamation-triangle" class="mr-1" /> Missing
+                    <AlertTriangle class="mr-1" size="16" /> Missing
                   </div>
                   <div v-else class="flex items-center text-blue-500">
-                    <font-awesome-icon icon="clock" class="mr-1" /> Pending
+                    <Clock class="mr-1" size="16" /> Pending
                   </div>
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm">
                   <div v-if="paper.flagged" class="flex items-center text-yellow-600" :title="paper.flagged">
-                    <font-awesome-icon icon="exclamation-triangle" class="mr-1" /> {{ paper.status.charAt(0).toUpperCase() + paper.status.slice(1) }}
+                    <AlertTriangle class="mr-1" size="16" /> {{ paper.status.charAt(0).toUpperCase() + paper.status.slice(1) }}
                   </div>
                   <div v-else-if="paper.status === 'clean'" class="flex items-center text-green-600">
-                    <font-awesome-icon icon="check" class="mr-1" /> Clean
+                    <Check class="mr-1" size="16" /> Clean
                   </div>
                   <div v-else-if="paper.status === 'duplicate'" class="flex items-center text-yellow-600">
-                    <font-awesome-icon icon="copy" class="mr-1" /> Duplicate
+                    <Copy class="mr-1" size="16" /> Duplicate
                   </div>
                   <div v-else-if="paper.status === 'incomplete'" class="flex items-center text-orange-500">
-                    <font-awesome-icon icon="exclamation-triangle" class="mr-1" /> Incomplete
+                    <AlertTriangle class="mr-1" size="16" /> Incomplete
                   </div>
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -243,7 +243,7 @@
       <div v-if="activeTab === 'retrieve'" class="p-6">
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex">
           <div class="text-blue-500 mr-3 mt-0.5">
-            <font-awesome-icon icon="question-circle" size="lg"/>
+            <HelpCircle size="24" />
           </div>
           <div>
             <h3 class="font-medium text-blue-800 mb-1">Retrieving Full Text PDFs</h3>
@@ -257,7 +257,7 @@
         <div class="grid grid-cols-3 gap-6 mb-6">
           <div class="bg-white rounded-lg border p-6 text-center hover:shadow-md transition-shadow">
             <div class="inline-flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 text-indigo-600 mb-4">
-              <font-awesome-icon icon="download" size="lg" />
+              <Download size="24" />
             </div>
             <h3 class="text-lg font-medium mb-2">Automatic Retrieval</h3>
             <p class="text-gray-600 text-sm mb-4">
@@ -269,7 +269,7 @@
               :disabled="isRetrieving"
             >
               <span v-if="isRetrieving">
-                <font-awesome-icon icon="spinner" spin class="mr-1" /> 
+                <Loader2 class="mr-1 inline-block animate-spin" size="16" /> 
                 Retrieving...
               </span>
               <span v-else>Retrieve All Missing PDFs</span>
@@ -278,7 +278,7 @@
           
           <div class="bg-white rounded-lg border p-6 text-center hover:shadow-md transition-shadow">
             <div class="inline-flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 text-indigo-600 mb-4">
-              <font-awesome-icon icon="upload" size="lg" />
+              <UploadCloud size="24" />
             </div>
             <h3 class="text-lg font-medium mb-2">Manual Upload</h3>
             <p class="text-gray-600 text-sm mb-4">
@@ -294,7 +294,7 @@
           
           <div class="bg-white rounded-lg border p-6 text-center hover:shadow-md transition-shadow">
             <div class="inline-flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 text-indigo-600 mb-4">
-              <font-awesome-icon icon="link" size="lg" />
+              <Link size="24" />
             </div>
             <h3 class="text-lg font-medium mb-2">Provide URLs</h3>
             <p class="text-gray-600 text-sm mb-4">
@@ -339,7 +339,7 @@
         </div>
         
         <div v-else-if="papers.length === 0" class="text-center py-12">
-          <font-awesome-icon icon="folder-open" class="text-gray-400 text-5xl mb-4" />
+          <FolderOpen class="text-gray-400 mx-auto mb-4" size="48" />
           <h3 class="text-xl font-medium mb-2">No Papers Found</h3>
           <p class="text-gray-600 mb-4">Try adjusting your filters or search terms.</p>
         </div>
@@ -374,13 +374,13 @@
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm">
                   <div v-if="paper.pdfStatus === 'available'" class="flex items-center text-green-600">
-                    <font-awesome-icon icon="check-circle" class="mr-1" /> Available
+                    <CheckCircle class="mr-1" size="16" /> Available
                   </div>
                   <div v-else-if="paper.pdfStatus === 'missing'" class="flex items-center text-orange-500">
-                    <font-awesome-icon icon="exclamation-triangle" class="mr-1" /> Missing
+                    <AlertTriangle class="mr-1" size="16" /> Missing
                   </div>
                   <div v-else class="flex items-center text-blue-500">
-                    <font-awesome-icon icon="spinner" spin class="mr-1" /> Retrieving...
+                    <Clock class="mr-1" size="16" /> Retrieving...
                   </div>
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -506,7 +506,7 @@
             class="text-gray-400 hover:text-gray-600"
             @click="showUploadModal = false"
           >
-            <font-awesome-icon icon="times" />
+            <X size="18" />
           </button>
         </div>
         
@@ -533,7 +533,7 @@
           <div v-if="uploadTab === 'upload'">
             <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6">
               <div class="mx-auto w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
-                <font-awesome-icon icon="upload" size="lg" class="text-indigo-600" />
+                <UploadCloud size="24" class="text-indigo-600" />
               </div>
               <h3 class="text-lg font-medium mb-2">Drop PDF files here</h3>
               <p class="text-gray-500 mb-4">or click to browse your computer</p>

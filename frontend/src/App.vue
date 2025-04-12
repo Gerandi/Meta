@@ -16,7 +16,7 @@
       <div class="flex-1 overflow-auto">
         <div v-if="needsProject && !activeProject" class="p-6 text-center">
           <div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
-            <font-awesome-icon icon="folder-open" class="text-gray-400 text-5xl mb-4" />
+            <FolderOpen class="text-gray-400 mx-auto" size="48" />
             <h2 class="text-xl font-medium mb-4">Please Select a Project</h2>
             <p class="text-gray-600 mb-6">You need to select or create a project before you can access this page.</p>
             <div class="flex justify-center space-x-4">
@@ -80,6 +80,7 @@ import ProjectDetail from './components/ProjectDetail.vue';
 import ProjectSelectModal from './components/ProjectSelectModal.vue';
 import ConfirmationModal from './components/ConfirmationModal.vue';
 import { API_ROUTES } from './config.js';
+import { FolderOpen } from 'lucide-vue-next';
 
 export default {
   name: 'App',
@@ -94,7 +95,8 @@ export default {
     Projects,
     ProjectDetail,
     ProjectSelectModal,
-    ConfirmationModal
+    ConfirmationModal,
+    FolderOpen
   },
   data() {
     return {

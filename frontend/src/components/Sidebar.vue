@@ -24,55 +24,55 @@
     
     <nav class="flex-grow">
       <SidebarItem 
-        icon="th-large" 
+        icon="LayoutGrid" 
         text="Dashboard" 
         :active="activeView === 'dashboard'" 
         @click="changeView('dashboard')" 
         :disabled="!activeProject"
       />
       <SidebarItem 
-        icon="search" 
+        icon="Search" 
         text="Find Papers" 
         :active="activeView === 'search'" 
         @click="changeView('search')" 
         :disabled="!activeProject"
       />
       <SidebarItem 
-        icon="tasks" 
+        icon="ClipboardList" 
         text="Process Papers" 
         :active="activeView === 'processing'" 
         @click="changeView('processing')" 
         :disabled="!activeProject"
       />
       <SidebarItem 
-        icon="file-alt" 
+        icon="FileText" 
         text="PDF Viewer" 
         :active="activeView === 'viewer'" 
         @click="changeView('viewer')" 
         :disabled="!activeProject"
       />
       <SidebarItem 
-        icon="edit" 
+        icon="PenLine" 
         text="Coding Sheet" 
         :active="activeView === 'codingSheet'" 
         @click="changeView('codingSheet')" 
         :disabled="!activeProject"
       />
       <SidebarItem 
-        icon="table" 
+        icon="Table" 
         text="Results Table" 
         :active="activeView === 'resultsTable'" 
         @click="changeView('resultsTable')" 
         :disabled="!activeProject"
       />
       <SidebarItem 
-        icon="folder" 
+        icon="Folder" 
         text="Projects" 
         :active="activeView === 'projects'" 
         @click="changeView('projects')" 
       />
       <SidebarItem 
-        icon="cog" 
+        icon="Settings" 
         text="Settings" 
         :active="activeView === 'settings'" 
         @click="changeView('settings')" 

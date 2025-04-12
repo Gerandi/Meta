@@ -12,13 +12,13 @@
             @click="downloadPdf"
             :disabled="!paper.open_access_url"
           >
-            <font-awesome-icon icon="download" />
+            <Download size="18" />
           </button>
           <button 
             class="px-3 py-1 rounded border hover:bg-gray-50"
             @click="toggleCodingPanel"
           >
-            <font-awesome-icon :icon="showCodingPanel ? 'times' : 'edit'" />
+            <component :is="showCodingPanel ? 'X' : 'Edit'" size="18" />
           </button>
         </div>
       </div>
@@ -50,7 +50,7 @@
           
           <div class="flex justify-center items-center h-64 bg-gray-100 rounded-lg border border-dashed border-gray-300 mb-4">
             <div class="text-center">
-              <font-awesome-icon icon="file-alt" class="text-gray-400 text-4xl mb-2" />
+              <FileText class="text-gray-400 mx-auto mb-2" size="48" />
               <p class="text-gray-500">PDF viewer will be available in the next version</p>
               <p class="text-sm text-gray-400">For now, you can download the PDF if available</p>
               <button 
@@ -206,7 +206,7 @@
           @click="saveData"
           :disabled="saving"
         >
-          <font-awesome-icon icon="save" class="mr-1" /> {{ saving ? 'Saving...' : 'Save Data' }}
+          <Save class="mr-1" size="18" /> {{ saving ? 'Saving...' : 'Save Data' }}
         </button>
       </div>
     </div>
@@ -215,9 +215,17 @@
 
 <script>
 import { API_ROUTES } from '../config.js';
+import { Download, Edit, X, FileText, Save } from 'lucide-vue-next';
 
 export default {
   name: 'PdfViewer',
+  components: {
+    Download,
+    Edit,
+    X,
+    FileText,
+    Save
+  },
   props: {
     paper: {
       type: Object,

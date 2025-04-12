@@ -2,7 +2,7 @@
   <div class="p-6">
     <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6">
       <div class="mx-auto w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
-        <font-awesome-icon icon="upload" class="text-indigo-600" size="2x" />
+        <UploadCloud class="text-indigo-600" size="32" />
       </div>
       <h3 class="text-lg font-medium mb-2">Drop PDF files here</h3>
       <p class="text-gray-500 mb-4">or click to browse your computer</p>
@@ -76,11 +76,13 @@
 
 <script>
 import UploadItem from './upload-item.vue';
+import { UploadCloud } from 'lucide-vue-next';
 
 export default {
   name: 'UploadTab',
   components: {
-    UploadItem
+    UploadItem,
+    UploadCloud
   },
   data() {
     return {

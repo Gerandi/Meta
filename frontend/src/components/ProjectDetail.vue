@@ -5,7 +5,7 @@
         class="text-indigo-600 hover:text-indigo-800 mr-4"
         @click="goBackToProjects"
       >
-        <font-awesome-icon icon="arrow-left" class="mr-1" /> Back to Projects
+        <ArrowLeft class="mr-1" size="18" /> Back to Projects
       </button>
       <h1 class="text-2xl font-bold flex-grow">{{ project.name }}</h1>
       <div class="flex space-x-2">
@@ -13,13 +13,13 @@
           class="flex items-center bg-white border text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-50"
           @click="configureCodingSheet"
         >
-          <font-awesome-icon icon="clipboard-list" class="mr-1" /> Configure Coding Sheet
+          <ClipboardList class="mr-1" size="18" /> Configure Coding Sheet
         </button>
         <button 
           class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
           @click="showEditModal = true"
         >
-          <font-awesome-icon icon="edit" class="mr-1" /> Edit
+          <Edit class="mr-1" size="18" /> Edit
         </button>
       </div>
     </div>
@@ -39,7 +39,7 @@
     </div>
     
     <div v-else-if="papers.length === 0" class="bg-white rounded-lg p-8 text-center shadow">
-      <font-awesome-icon icon="file-alt" class="text-gray-400 text-5xl mb-4" />
+      <FileText class="text-gray-400 mx-auto" size="48" />
       <h3 class="text-xl font-medium mb-2">No Papers in This Project</h3>
       <p class="text-gray-600 mb-4">Add papers by searching and selecting "Add to Project".</p>
       <button 
@@ -58,7 +58,7 @@
             class="text-indigo-600 mr-4 hover:text-indigo-800"
             @click="exportPapers"
           >
-            <font-awesome-icon icon="download" class="mr-1" /> Export
+            <Download class="mr-1" size="18" /> Export
           </button>
         </div>
       </div>
@@ -87,7 +87,7 @@
                 class="text-red-600 hover:text-red-800"
                 @click="confirmRemove(paper)"
               >
-                <font-awesome-icon icon="times" />
+                <X size="18" />
               </button>
               <button 
                 class="mt-auto text-indigo-600 hover:text-indigo-800"
@@ -171,9 +171,18 @@
 
 <script>
 import { API_ROUTES } from '../config.js';
+import { ArrowLeft, ClipboardList, Edit, FileText, Download, X } from 'lucide-vue-next';
 
 export default {
   name: 'ProjectDetail',
+  components: {
+    ArrowLeft,
+    ClipboardList,
+    Edit,
+    FileText,
+    Download,
+    X
+  },
   props: {
     projectId: {
       type: Number,

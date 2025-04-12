@@ -6,19 +6,19 @@
         class="text-indigo-600 hover:text-indigo-800 mr-4"
         @click="goBack"
       >
-        <font-awesome-icon icon="arrow-left" class="mr-1" /> Back to Project
+        <ArrowLeft class="inline mr-1" size="18" /> Back to Project
       </button>
       <h1 class="text-2xl font-bold flex-grow">{{ projectName }} - Coding Sheet Configuration</h1>
       <div class="flex">
         <button class="mr-2 px-4 py-2 bg-white border rounded-lg text-gray-700 hover:bg-gray-50 flex items-center"
           @click="duplicateCodingSheet">
-          <font-awesome-icon icon="copy" class="mr-1" />
+          <Copy class="mr-1" size="18" />
           Duplicate
         </button>
         <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center"
           @click="saveConfiguration"
           :disabled="saving">
-          <font-awesome-icon icon="save" class="mr-1" />
+          <Save class="mr-1" size="18" />
           {{ saving ? 'Saving...' : 'Save Changes' }}
         </button>
       </div>
@@ -38,16 +38,16 @@
           <button class="text-indigo-600 hover:text-indigo-800 flex items-center text-sm mr-2"
             @click="moveSection(sectionIndex, 'up')"
             :disabled="sectionIndex === 0">
-            <font-awesome-icon icon="chevron-up" class="mr-1" /> Move Up
+            <ChevronUp class="mr-1" size="16" /> Move Up
           </button>
           <button class="text-indigo-600 hover:text-indigo-800 flex items-center text-sm mr-2"
             @click="moveSection(sectionIndex, 'down')"
             :disabled="sectionIndex === sectionsArray.length - 1">
-            <font-awesome-icon icon="chevron-down" class="mr-1" /> Move Down
+            <ChevronDown class="mr-1" size="16" /> Move Down
           </button>
           <button class="text-gray-500 hover:text-gray-700"
             @click="openSectionSettings(sectionIndex)">
-            <font-awesome-icon icon="cog" />
+            <Settings size="16" />
           </button>
         </div>
       </div>
@@ -60,7 +60,7 @@
             <div class="font-medium flex items-center">
               {{ field.label }}
               <span v-if="field.required" class="ml-2 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-              <font-awesome-icon icon="question-circle" class="ml-2 text-gray-400" :title="field.description" />
+              <HelpCircle class="ml-2 text-gray-400" size="16" :title="field.description" />
             </div>
             <div class="text-sm text-gray-500 flex items-center">
               <span>{{ getFieldTypeName(field.type) }}</span>
@@ -72,11 +72,11 @@
           <div class="flex opacity-0 group-hover:opacity-100 transition-opacity">
             <button class="p-1 text-gray-400 hover:text-gray-600 mr-1"
               @click="editField(sectionIndex, fieldIndex)">
-              <font-awesome-icon icon="edit" />
+              <Edit size="16" />
             </button>
             <button class="p-1 text-gray-400 hover:text-red-600"
               @click="deleteField(sectionIndex, fieldIndex)">
-              <font-awesome-icon icon="trash" />
+              <Trash2 size="16" />
             </button>
           </div>
         </div>
@@ -85,14 +85,14 @@
       <!-- Add Field Button -->
       <button class="flex items-center text-indigo-600 hover:text-indigo-800 mt-2"
         @click="addField(sectionIndex)">
-        <font-awesome-icon icon="plus-circle" class="mr-1" /> Add Field
+        <PlusCircle class="mr-1" size="16" /> Add Field
       </button>
     </div>
     
     <!-- Add new section button -->
     <button class="flex items-center text-indigo-600 hover:text-indigo-800 mb-6"
       @click="addSection">
-      <font-awesome-icon icon="plus-circle" class="mr-1" /> Add New Section
+      <PlusCircle class="mr-1" size="16" /> Add New Section
     </button>
     
     <!-- Save and Cancel Buttons -->
@@ -114,7 +114,7 @@
         <div class="p-4 border-b flex justify-between items-center">
           <h3 class="font-medium">{{ editingIndex !== null ? 'Edit Field' : 'Add Field' }}</h3>
           <button class="text-gray-400 hover:text-gray-600" @click="closeFieldModal">
-            <font-awesome-icon icon="times" />
+            <X size="18" />
           </button>
         </div>
         
@@ -242,7 +242,7 @@
         <div class="p-4 border-b flex justify-between items-center">
           <h3 class="font-medium">Section Settings</h3>
           <button class="text-gray-400 hover:text-gray-600" @click="closeSectionModal">
-            <font-awesome-icon icon="times" />
+            <X size="18" />
           </button>
         </div>
         
@@ -317,9 +317,35 @@
 
 <script>
 import { API_ROUTES } from '../config.js';
+import { 
+  ArrowLeft, 
+  Copy, 
+  Save, 
+  ChevronUp, 
+  ChevronDown, 
+  Settings, 
+  HelpCircle, 
+  Edit, 
+  Trash2, 
+  PlusCircle, 
+  X
+} from 'lucide-vue-next';
 
 export default {
   name: 'CodingSheet',
+  components: {
+    ArrowLeft, 
+    Copy, 
+    Save, 
+    ChevronUp, 
+    ChevronDown, 
+    Settings, 
+    HelpCircle, 
+    Edit, 
+    Trash2, 
+    PlusCircle,
+    X
+  },
   props: {
     projectId: {
       type: Number,

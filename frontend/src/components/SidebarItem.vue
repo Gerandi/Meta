@@ -10,7 +10,7 @@
     @click="!disabled && $emit('click')"
   >
     <div class="mr-3">
-      <font-awesome-icon :icon="icon" size="sm" />
+      <component :is="icon" size="18" />
     </div>
     <div>{{ text }}</div>
   </div>
