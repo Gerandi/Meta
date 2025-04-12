@@ -821,9 +821,19 @@ export default {
         // Handle successful project batch API response
         const result = await response.json();
         console.log('Project batch API result:', result);
+        
+        // If papers were added successfully, copy any associated files to the project directory
+        if (result.added_count > 0) {
+          // In a future implementation, we could add an API call here to move/copy PDF files 
+          // to the project directory if they're stored elsewhere
+        }
+        
         alert(`${result.added_count || 0} paper(s) added to project successfully. ${result.skipped_count || 0} were already in the project.`);
         this.showProjectModal = false;
         this.papersToAddToProject = [];
+        
+        // Refresh the imported papers list to show updated associations
+        await this.fetchImportedPapers();
       } catch (error) {
         console.error('Error adding papers to project:', error);
         alert('There was a problem adding papers to the project: ' + error.message);
@@ -832,11 +842,19 @@ export default {
     
     addToProject(paper) {
       // Add single paper to selected project
-      if (paper.id) {
+      
+      // First import the paper to get a database ID
+      if (!paper.id) {
+        // Paper from search results doesn't have an ID yet - needs to be imported first
+        console.log('Paper needs to be imported first before adding to project');
+        
+        // Import single paper
+        this.selectedPapers = [paper];
+        this.importSelectedPapers();
+      } else {
+        // Paper already has an ID (from imported papers list)
         this.selectedImportedPapers = [paper.id];
         this.showProjectModal = true;
-      } else {
-        console.error('Paper has no ID:', paper);
       }
     },
     
@@ -858,12 +876,63 @@ export default {
         this.isLoading = true;
         console.log('Importing papers:', this.selectedPapers);
         
+        // Format papers for import - convert from search results to importable format
+        const formattedPapers = this.selectedPapers.map(paper => {
+          // Format authors properly according to the schema
+          let formattedAuthors = [];
+          if (Array.isArray(paper.authors)) {
+            formattedAuthors = paper.authors.map(author => {
+              // If author is already in the right format, use it
+              if (typeof author === 'object' && author !== null && author.name) {
+                return author;
+              }
+              // Otherwise create a proper author object
+              if (typeof author === 'string') {
+                return { name: author };
+              }
+              if (typeof author === 'object' && author !== null) {
+                if (author.firstName && author.lastName) {
+                  return { name: `${author.firstName} ${author.lastName}` };
+                }
+                if (author.given && author.family) {
+                  return { name: `${author.given} ${author.family}` };
+                }
+              }
+              return { name: 'Unknown Author' };
+            });
+          } else if (typeof paper.authors === 'string') {
+            formattedAuthors = [{ name: paper.authors }];
+          } else {
+            formattedAuthors = [{ name: 'Unknown Author' }];
+          }
+          
+          return {
+            title: paper.title || 'Unknown Title',
+            abstract: paper.abstract || '',
+            doi: paper.doi,
+            authors: formattedAuthors,
+            publication_date: paper.publication_date,
+            journal: paper.journal,
+            volume: paper.volume,
+            issue: paper.issue,
+            pages: paper.pages,
+            publisher: paper.publisher,
+            url: paper.url,
+            keywords: Array.isArray(paper.keywords) ? paper.keywords : [],
+            is_open_access: paper.is_open_access || false,
+            open_access_url: paper.open_access_url,
+            source: paper.source || 'Search Import'
+          };
+        });
+        
+        console.log('Formatted papers for import:', formattedPapers);
+        
         const response = await fetch(API_ROUTES.PAPERS.IMPORT_BATCH, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ papers: this.selectedPapers })
+          body: JSON.stringify({ papers: formattedPapers })
         });
         
         if (!response.ok) {

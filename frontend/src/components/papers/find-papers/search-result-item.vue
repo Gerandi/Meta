@@ -14,7 +14,7 @@
     </div>
     <div class="text-sm text-gray-700 mb-1">{{ formatAuthors(paper.authors) }}</div>
     <div class="text-sm text-gray-500 mb-2">{{ paper.journal || 'Unknown Journal' }} • {{ getYear(paper.publication_date) }}</div>
-    <div class="text-sm text-gray-600 mb-3">{{ paper.abstract || 'No abstract available for this paper.' }}</div>
+    <div class="text-sm text-gray-600 mb-3 line-clamp-3">{{ paper.abstract || 'No abstract available for this paper.' }}</div>
     <div class="flex">
       <button 
         v-if="paper.doi || paper.open_access_url" 
@@ -25,7 +25,7 @@
       </button>
       <button 
         class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
-        @click.stop="$emit('add-to-project')"
+        @click.stop="handleImportAction"
       >
         <PlusCircle class="mr-1" size="16" /> Import
       </button>
@@ -102,6 +102,11 @@ export default {
       }
       
       return 'Unknown Year';
+    },
+    
+    handleImportAction() {
+      // First import the paper, then add to project
+      this.$emit('add-to-project');
     }
   }
 };

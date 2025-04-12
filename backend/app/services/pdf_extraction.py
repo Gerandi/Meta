@@ -182,13 +182,14 @@ async def enhance_metadata_with_api(basic_metadata: Dict[str, Any]) -> Dict[str,
         return enhanced_metadata
 
 
-async def process_pdf_file(file_content: bytes, filename: str) -> Dict[str, Any]:
+async def process_pdf_file(file_content: bytes, filename: str, project_id: Optional[int] = None) -> Dict[str, Any]:
     """
     Process a PDF file to extract metadata and store the file.
     
     Args:
         file_content: Raw PDF file content
         filename: Original filename
+        project_id: Optional project ID to organize files by project
     
     Returns:
         Dict containing the extracted metadata and file info
@@ -199,9 +200,10 @@ async def process_pdf_file(file_content: bytes, filename: str) -> Dict[str, Any]
     # Add filename to metadata
     metadata["filename"] = filename
     metadata["file_size"] = len(file_content)
+    metadata["project_id"] = project_id
     
-    # Store the file (this would be implemented to save to disk or database)
-    file_path = await store_pdf_file(file_content, filename)
+    # Store the file in the appropriate project directory if project_id is provided
+    file_path = await store_pdf_file(file_content, filename, project_id)
     
     if file_path:
         metadata["file_path"] = file_path
@@ -209,23 +211,31 @@ async def process_pdf_file(file_content: bytes, filename: str) -> Dict[str, Any]
     return metadata
 
 
-async def store_pdf_file(file_content: bytes, filename: str) -> Optional[str]:
+async def store_pdf_file(file_content: bytes, filename: str, project_id: Optional[int] = None) -> Optional[str]:
     """
     Store a PDF file to disk.
     
     Args:
         file_content: Raw PDF file content
         filename: Original filename
+        project_id: Optional project ID to organize files by project
     
     Returns:
         Path to the stored file or None if storage failed
     """
     try:
-        # Create uploads directory if it doesn't exist
-        upload_dir = os.path.join(os.getcwd(), "uploads")
-        os.makedirs(upload_dir, exist_ok=True)
+        # Create base uploads directory if it doesn't exist
+        base_upload_dir = os.path.join(os.getcwd(), "uploads")
+        os.makedirs(base_upload_dir, exist_ok=True)
         
-        # Generate a safe filename
+        # If project_id is provided, create a subdirectory for the project
+        if project_id:
+            upload_dir = os.path.join(base_upload_dir, f"project_{project_id}")
+            os.makedirs(upload_dir, exist_ok=True)
+        else:
+            upload_dir = base_upload_dir
+        
+        # Generate a safe filename with UUID to avoid conflicts
         import uuid
         safe_filename = f"{uuid.uuid4()}_{os.path.basename(filename)}"
         file_path = os.path.join(upload_dir, safe_filename)

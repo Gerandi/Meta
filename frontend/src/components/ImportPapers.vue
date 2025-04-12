@@ -514,37 +514,410 @@ export default {
       return this.importedPapers.length > 0 && this.selectedPaperIds.length === this.importedPapers.length;
     }
   },
+  mounted() {
+    this.fetchImportedPapers();
+  },
   methods: {
     continueToProcessing() {
-      // Continue to processing logic
+      // Continue to processing page with selected papers
+      this.$emit('continue-to-processing', this.selectedPaperIds);
+    },
+    async fetchImportedPapers() {
+      try {
+        const response = await fetch(API_ROUTES.PAPERS.LIST);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || `Failed to fetch imported papers: ${response.status}`);
+        }
+        
+        this.importedPapers = await response.json();
+        console.log(`Fetched ${this.importedPapers.length} imported papers`);
+      } catch (error) {
+        console.error('Error fetching imported papers:', error);
+        this.importedPapers = [];
+      }
     },
     handleFileUpload(event) {
-      // Handle file upload logic
+      if (!event.target.files || event.target.files.length === 0) return;
+      
+      const files = Array.from(event.target.files);
+      this.processFiles(files);
+    },
+    handleBulkFileUpload(event) {
+      if (!event.target.files || event.target.files.length === 0) return;
+      
+      const files = Array.from(event.target.files);
+      this.processFiles(files);
+      this.showBulkImportModal = false;
+    },
+    processFiles(files) {
+      this.isUploading = true;
+      
+      // Create file upload queue with initial status
+      this.uploadingFiles = files.map(file => ({
+        file,
+        name: file.name,
+        size: file.size,
+        progress: 0,
+        status: 'queued'
+      }));
+      
+      // Start uploading each file
+      this.uploadFiles();
+    },
+    async uploadFiles() {
+      for (let i = 0; i < this.uploadingFiles.length; i++) {
+        const item = this.uploadingFiles[i];
+        if (item.status === 'queued') {
+          try {
+            // Update status to uploading
+            this.$set(this.uploadingFiles, i, { ...item, status: 'uploading' });
+            
+            // Upload the file
+            const fileId = await this.uploadFile(item.file, i);
+            
+            // Mark as complete with the file ID
+            this.$set(this.uploadingFiles, i, {
+              ...this.uploadingFiles[i],
+              status: 'complete',
+              progress: 100,
+              fileId
+            });
+          } catch (error) {
+            console.error(`Error uploading ${item.name}:`, error);
+            this.$set(this.uploadingFiles, i, {
+              ...this.uploadingFiles[i],
+              status: 'error',
+              error: error.message
+            });
+          }
+        }
+      }
+      
+      // Process metadata after all uploads
+      if (this.uploadingFiles.some(f => f.status === 'complete')) {
+        await this.extractMetadata();
+        
+        // Refresh imported papers list
+        this.fetchImportedPapers();
+      }
+      
+      this.isUploading = false;
+    },
+    uploadFile(file, index) {
+      return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // If an active project is set, associate the file with it
+        if (this.activeProject && this.activeProject.id) {
+          formData.append('project_id', this.activeProject.id);
+        }
+        
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = Math.round((event.loaded / event.total) * 100);
+            this.$set(this.uploadingFiles, index, {
+              ...this.uploadingFiles[index],
+              progress: percentComplete
+            });
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              // Return the file ID or other identifier
+              const fileId = response.file_id || response.filename || file.name;
+              
+              // Store project association in metadata if available
+              if (this.activeProject && this.activeProject.id) {
+                this.$set(this.uploadingFiles, index, {
+                  ...this.uploadingFiles[index],
+                  project_id: this.activeProject.id
+                });
+              }
+              
+              resolve(fileId);
+            } catch (e) {
+              resolve(file.name); // Fallback if can't parse response
+            }
+          } else {
+            reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error during upload'));
+        });
+        
+        xhr.open('POST', API_ROUTES.PAPERS.UPLOAD);
+        xhr.send(formData);
+      });
+    },
+    async extractMetadata() {
+      try {
+        this.extractingMetadata = true;
+        
+        // Get file IDs from completed uploads
+        const fileIds = this.uploadingFiles
+          .filter(item => item.status === 'complete' && item.fileId)
+          .map(item => item.fileId);
+          
+        if (fileIds.length === 0) {
+          throw new Error('No files available for metadata extraction');
+        }
+        
+        // Call the API to extract metadata
+        const response = await fetch(API_ROUTES.PAPERS.EXTRACT_METADATA, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ file_ids: fileIds })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || 'Failed to extract metadata');
+        }
+        
+        const data = await response.json();
+        console.log('Metadata extraction results:', data);
+        
+        // Process each file's metadata
+        const papersToImport = [];
+        
+        for (const result of data) {
+          if (result.status === 'success' || result.status === 'partial') {
+            const metadata = result.metadata;
+            
+            // Add to import list
+            papersToImport.push({
+              title: metadata.title || 'Unknown Title',
+              abstract: metadata.abstract || '',
+              authors: metadata.authors || [],
+              journal: metadata.journal || '',
+              publication_date: metadata.year ? new Date(metadata.year, 0, 1).toISOString() : null,
+              doi: metadata.doi || null,
+              file_path: metadata.file_path || '',
+              is_open_access: false,
+              source: 'PDF Upload'
+            });
+          }
+        }
+        
+        // Import the papers to the database
+        if (papersToImport.length > 0) {
+          await this.importPapers(papersToImport);
+        }
+      } catch (error) {
+        console.error('Error extracting metadata:', error);
+        alert('Error extracting metadata: ' + error.message);
+      } finally {
+        this.extractingMetadata = false;
+      }
+    },
+    async importPapers(papers) {
+      try {
+        // Call the API to import papers
+        const response = await fetch(API_ROUTES.PAPERS.IMPORT_BATCH, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ papers })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || 'Failed to import papers');
+        }
+        
+        const result = await response.json();
+        console.log('Import result:', result);
+        
+        if (result.imported_count > 0) {
+          alert(`${result.imported_count} paper(s) imported successfully.`);
+        } else {
+          alert('No papers were imported. Please check the metadata and try again.');
+        }
+      } catch (error) {
+        console.error('Error importing papers:', error);
+        alert('Error importing papers: ' + error.message);
+      }
     },
     openBulkImportModal() {
       this.showBulkImportModal = true;
     },
-    handleBulkFileUpload(event) {
-      // Handle bulk file upload logic
-    },
     openManualEntryModal() {
       this.showManualEntryModal = true;
     },
-    addManualPaper() {
-      // Add manual paper logic
+    async addManualPaper() {
+      try {
+        // Convert the manual paper input to the expected format
+        const authors = this.manualPaper.authors.split(',').map(name => ({
+          name: name.trim()
+        }));
+        
+        const paper = {
+          title: this.manualPaper.title,
+          authors: authors,
+          journal: this.manualPaper.journal || null,
+          publication_date: this.manualPaper.year ? new Date(this.manualPaper.year, 0, 1).toISOString() : null,
+          doi: this.manualPaper.doi || null,
+          abstract: this.manualPaper.abstract || null,
+          source: 'Manual Entry'
+        };
+        
+        // Import the paper
+        await this.importPapers([paper]);
+        
+        // Reset form and close modal
+        this.manualPaper = {
+          title: '',
+          authors: '',
+          journal: '',
+          year: '',
+          doi: '',
+          abstract: ''
+        };
+        
+        this.showManualEntryModal = false;
+        
+        // Refresh imported papers
+        this.fetchImportedPapers();
+      } catch (error) {
+        console.error('Error adding manual paper:', error);
+        alert('Error adding paper: ' + error.message);
+      }
     },
     editPaper(paper) {
-      this.editingPaper = { ...paper };
+      // Convert authors array to string for editing
+      let authorsString = '';
+      if (paper.authors) {
+        if (Array.isArray(paper.authors)) {
+          authorsString = paper.authors.map(author => {
+            if (typeof author === 'string') return author;
+            return author.name || 'Unknown';
+          }).join(', ');
+        } else {
+          authorsString = String(paper.authors);
+        }
+      }
+      
+      // Extract year from publication_date
+      let year = null;
+      if (paper.publication_date) {
+        const date = new Date(paper.publication_date);
+        if (!isNaN(date.getTime())) {
+          year = date.getFullYear();
+        }
+      }
+      
+      this.editingPaper = {
+        ...paper,
+        authors: authorsString,
+        year: year
+      };
+      
       this.showEditModal = true;
     },
-    updatePaper() {
-      // Update paper logic
+    async updatePaper() {
+      try {
+        // Convert the editing paper back to proper format
+        const authors = this.editingPaper.authors.split(',').map(name => ({
+          name: name.trim()
+        }));
+        
+        const paperId = this.editingPaper.id;
+        const updatedPaper = {
+          title: this.editingPaper.title,
+          authors: authors,
+          journal: this.editingPaper.journal || null,
+          publication_date: this.editingPaper.year ? new Date(this.editingPaper.year, 0, 1).toISOString() : null,
+          doi: this.editingPaper.doi || null,
+          abstract: this.editingPaper.abstract || null
+        };
+        
+        // Call API to update the paper
+        const response = await fetch(API_ROUTES.PAPERS.GET_BY_ID(paperId), {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updatedPaper)
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || 'Failed to update paper');
+        }
+        
+        // Close modal and refresh list
+        this.showEditModal = false;
+        this.fetchImportedPapers();
+        
+        alert('Paper updated successfully.');
+      } catch (error) {
+        console.error('Error updating paper:', error);
+        alert('Error updating paper: ' + error.message);
+      }
     },
-    removePaper(paperId) {
-      // Remove paper logic
+    async removePaper(paperId) {
+      if (confirm('Are you sure you want to remove this paper?')) {
+        try {
+          // Call API to delete the paper
+          const response = await fetch(API_ROUTES.PAPERS.GET_BY_ID(paperId), {
+            method: 'DELETE'
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || 'Failed to delete paper');
+          }
+          
+          // Update the local list
+          this.importedPapers = this.importedPapers.filter(paper => paper.id !== paperId);
+          this.selectedPaperIds = this.selectedPaperIds.filter(id => id !== paperId);
+          
+          alert('Paper removed successfully.');
+        } catch (error) {
+          console.error('Error removing paper:', error);
+          alert('Error removing paper: ' + error.message);
+        }
+      }
     },
-    removeSelectedPapers() {
-      // Remove selected papers logic
+    async removeSelectedPapers() {
+      if (this.selectedPaperIds.length === 0) return;
+      
+      if (confirm(`Are you sure you want to remove ${this.selectedPaperIds.length} selected papers?`)) {
+        try {
+          // Delete each selected paper
+          const deletePromises = this.selectedPaperIds.map(paperId => {
+            return fetch(API_ROUTES.PAPERS.GET_BY_ID(paperId), {
+              method: 'DELETE'
+            });
+          });
+          
+          await Promise.all(deletePromises);
+          
+          // Update the local list
+          this.importedPapers = this.importedPapers.filter(paper => !this.selectedPaperIds.includes(paper.id));
+          this.selectedPaperIds = [];
+          
+          alert('Selected papers removed successfully.');
+        } catch (error) {
+          console.error('Error removing selected papers:', error);
+          alert('Error removing papers: ' + error.message);
+          // Refresh list to show current state
+          this.fetchImportedPapers();
+        }
+      }
     },
     toggleSelectAll() {
       if (this.isAllSelected) {
@@ -565,16 +938,67 @@ export default {
       return this.selectedPaperIds.includes(paperId);
     },
     formatFileSize(size) {
-      // Format file size logic
+      if (size < 1024) {
+        return `${size} B`;
+      } else if (size < 1024 * 1024) {
+        return `${(size / 1024).toFixed(1)} KB`;
+      } else {
+        return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+      }
     },
     formatAuthors(authors) {
-      // Format authors logic
+      if (!authors) return 'Unknown Authors';
+      
+      if (typeof authors === 'string') {
+        return authors;
+      }
+      
+      if (!Array.isArray(authors) || authors.length === 0) {
+        return 'Unknown Authors';
+      }
+      
+      // Handle different author formats
+      const getAuthorName = (author) => {
+        if (typeof author === 'string') return author;
+        if (typeof author === 'object' && author !== null) {
+          if (author.name) return author.name;
+          if (author.firstName && author.lastName) return `${author.firstName} ${author.lastName}`;
+          if (author.given && author.family) return `${author.given} ${author.family}`;
+        }
+        return 'Unknown';
+      };
+      
+      if (authors.length <= 3) {
+        return authors.map(getAuthorName).join(', ');
+      } else {
+        return `${getAuthorName(authors[0])}, et al.`;
+      }
     },
     getStatusClass(status) {
-      // Get status class logic
+      switch (status) {
+        case 'imported':
+        case 'complete':
+          return 'bg-green-100 text-green-800';
+        case 'processing':
+          return 'bg-yellow-100 text-yellow-800';
+        case 'error':
+          return 'bg-red-100 text-red-800';
+        default:
+          return 'bg-gray-100 text-gray-800';
+      }
     },
     getStatusText(status) {
-      // Get status text logic
+      switch (status) {
+        case 'imported':
+        case 'complete':
+          return 'Imported';
+        case 'processing':
+          return 'Processing...';
+        case 'error':
+          return 'Error';
+        default:
+          return status || 'Unknown';
+      }
     }
   }
 };

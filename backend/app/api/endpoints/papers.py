@@ -6,6 +6,8 @@ import json
 import csv
 import logging
 import asyncio
+import os
+import uuid
 from io import StringIO
 
 logger = logging.getLogger(__name__)
@@ -266,6 +268,7 @@ async def batch_find_dois(
 @router.post("/upload", response_model=Dict[str, Any])
 async def upload_pdf(
     file: UploadFile = File(...),
+    project_id: Optional[int] = Query(None, description="Optional project ID to associate the file with"),
     background_tasks: BackgroundTasks = None,
 ):
     """
@@ -274,6 +277,8 @@ async def upload_pdf(
     This endpoint accepts a PDF file upload, processes it to extract metadata,
     and returns the extracted information including title, authors, and other
     bibliographic data when available.
+    
+    Optionally, the file can be associated with a project by providing the project_id parameter.
     """
     try:
         # Check if the file is a PDF
@@ -283,8 +288,8 @@ async def upload_pdf(
         # Read the file contents
         file_content = await file.read()
         
-        # Process the PDF file
-        metadata = await process_pdf_file(file_content, file.filename)
+        # Process the PDF file and store it in the project folder if project_id is provided
+        metadata = await process_pdf_file(file_content, file.filename, project_id)
         
         # Set status based on metadata extraction success
         if metadata.get("title"):
@@ -292,6 +297,10 @@ async def upload_pdf(
         else:
             metadata["status"] = "partial"
             metadata["message"] = "Metadata extracted partially. Some fields may be missing."
+        
+        # Add file_id to response for easier tracking
+        file_id = str(uuid.uuid4())
+        metadata["file_id"] = file_id
         
         return metadata
     
@@ -313,22 +322,56 @@ async def extract_metadata_from_pdfs(
     """
     try:
         results = []
+        upload_dir = os.path.join(os.getcwd(), "uploads")
+        
         for file_id in file_ids:
-            # This would be implemented to retrieve the file from storage
-            # and extract metadata from it
-            # For now, return a mock response
-            result = {
-                "file_id": file_id,
-                "status": "success",
-                "metadata": {
-                    "title": f"Extracted Title for {file_id}",
-                    "authors": [{"name": "Author 1"}, {"name": "Author 2"}],
-                    "year": 2023,
-                    "journal": "Journal of Mock Data",
-                    "abstract": "This is a mock abstract for the extracted metadata."
+            try:
+                # Find the uploaded file based on the file_id
+                # We assume file_id appears in the filename as per store_pdf_file function
+                matching_files = [f for f in os.listdir(upload_dir) if file_id in f]
+                
+                if not matching_files:
+                    logger.warning(f"No file found for ID: {file_id}")
+                    results.append({
+                        "file_id": file_id,
+                        "status": "error",
+                        "error": "File not found"
+                    })
+                    continue
+                
+                # Use the first matching file
+                file_path = os.path.join(upload_dir, matching_files[0])
+                
+                # Read the file content
+                with open(file_path, "rb") as f:
+                    file_content = f.read()
+                
+                # Extract metadata from the PDF
+                metadata = await extract_metadata_from_pdf(file_content)
+                
+                # Enhance metadata if requested
+                if enhance and metadata.get("title"):
+                    metadata = await enhance_metadata_with_api(metadata)
+                
+                # Add file path to metadata
+                metadata["file_path"] = file_path
+                metadata["filename"] = os.path.basename(file_path)
+                
+                result = {
+                    "file_id": file_id,
+                    "status": "success" if metadata.get("title") else "partial",
+                    "metadata": metadata
                 }
-            }
-            results.append(result)
+                
+                results.append(result)
+                
+            except Exception as e:
+                logger.error(f"Error processing file {file_id}: {str(e)}")
+                results.append({
+                    "file_id": file_id,
+                    "status": "error",
+                    "error": str(e)
+                })
         
         return results
     

@@ -46,7 +46,8 @@ async def get_paper_counts(db: Session = Depends(get_db)):
                 PaperModel.publication_date == None,
                 PaperModel.abstract == None,
                 PaperModel.abstract == "",
-                PaperModel.authors == "[]"
+                # Modified to correctly check for empty authors array
+                func.json_array_length(PaperModel.authors) == 0
             )
         ).scalar()
         
