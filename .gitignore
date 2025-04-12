@@ -1,2 +1,3 @@
 # Exclude original_mockups folder and its contents
+original_mockups/
 original_mockups/*
