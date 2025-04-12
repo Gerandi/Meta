@@ -43,10 +43,10 @@
           <div class="flex justify-between items-start">
             <h3 class="text-xl font-semibold mb-2">{{ project.name }}</h3>
             <div class="dropdown relative">
-              <button class="text-gray-500 hover:text-gray-700">
+              <button class="text-gray-500 hover:text-gray-700" @click.stop="toggleDropdown($event)">
                 <font-awesome-icon icon="ellipsis-v" />
               </button>
-              <div class="dropdown-menu hidden absolute right-0 mt-2 bg-white rounded-lg shadow-lg p-2 z-10">
+              <div class="dropdown-menu absolute right-0 mt-2 bg-white rounded-lg shadow-lg p-2 z-10">
                 <button 
                   class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
                   @click="setActiveProject(project)"
@@ -181,12 +181,9 @@ export default {
     
     // Add click handler for dropdown menus
     document.addEventListener('click', (e) => {
-      const dropdowns = document.querySelectorAll('.dropdown');
-      dropdowns.forEach(dropdown => {
-        if (!dropdown.contains(e.target)) {
-          const menu = dropdown.querySelector('.dropdown-menu');
-          if (menu) menu.classList.add('hidden');
-        }
+      const dropdowns = document.querySelectorAll('.dropdown-menu');
+      dropdowns.forEach(menu => {
+        menu.classList.remove('active');
       });
     });
   },
@@ -196,14 +193,37 @@ export default {
       this.error = null;
       
       try {
-        const response = await fetch(API_ROUTES.PROJECTS.LIST);
+        console.log('Fetching projects from:', API_ROUTES.PROJECTS.LIST);
+        const response = await fetch(API_ROUTES.PROJECTS.LIST, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
         
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to load projects');
+          let errorDetail = 'Failed to load projects';
+          try {
+            const errorData = await response.json();
+            console.error('Error response:', errorData);
+            if (errorData.detail) {
+              errorDetail = errorData.detail;
+            }
+          } catch (e) {
+            console.error('Error parsing error response:', e);
+            errorDetail = `Server error: ${response.status} ${response.statusText}`;
+          }
+          throw new Error(errorDetail);
         }
         
-        this.projects = await response.json();
+        const projects = await response.json().catch(err => {
+          console.error('Error parsing JSON:', err, 'Response:', response);
+          throw new Error('Failed to parse server response');
+        });
+        console.log('Fetched projects:', projects);
+        this.projects = projects || [];
+        console.log('Projects array after update:', this.projects);
       } catch (err) {
         this.error = err.message;
         console.error('Error fetching projects:', err);
@@ -213,8 +233,20 @@ export default {
     },
     
     toggleDropdown(event) {
+      // First close any open dropdowns
+      const allMenus = document.querySelectorAll('.dropdown-menu');
+      allMenus.forEach(menu => {
+        if (menu !== event.currentTarget.nextElementSibling) {
+          menu.classList.remove('active');
+        }
+      });
+      
+      // Toggle the clicked dropdown
       const menu = event.currentTarget.nextElementSibling;
-      menu.classList.toggle('hidden');
+      menu.classList.toggle('active');
+      
+      // Prevent event from propagating to document click handler
+      event.stopPropagation();
     },
     
     viewProject(project) {
@@ -253,24 +285,43 @@ export default {
         let method = 'POST';
         
         if (this.showEditModal) {
-          url = API_ROUTES.PROJECTS.GET_BY_ID(this.editingProjectId);
+          url = API_ROUTES.PROJECTS.UPDATE(this.editingProjectId);
           method = 'PUT';
         }
+        
+        console.log(`Saving project with ${method} to ${url}:`, this.formData);
         
         const response = await fetch(url, {
           method,
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           },
           body: JSON.stringify(this.formData)
         });
         
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to save project');
+          let errorDetail = 'Failed to save project';
+          try {
+            const errorData = await response.json();
+            console.error('Error response:', errorData);
+            if (errorData.detail) {
+              errorDetail = errorData.detail;
+            }
+          } catch (e) {
+            console.error('Error parsing error response:', e);
+          }
+          throw new Error(errorDetail);
         }
         
+        const savedProject = await response.json().catch(err => {
+          console.error('Error parsing JSON response:', err);
+          return this.formData; // Use form data as fallback
+        });
+        console.log('Project saved successfully:', savedProject);
+        
         // Refresh projects list
+        console.log('Refreshing projects list after save...');
         await this.fetchProjects();
         
         // Close modal
@@ -283,7 +334,7 @@ export default {
     
     async deleteProject() {
       try {
-        const response = await fetch(API_ROUTES.PROJECTS.GET_BY_ID(this.projectToDelete.id), {
+        const response = await fetch(API_ROUTES.PROJECTS.DELETE(this.projectToDelete.id), {
           method: 'DELETE'
         });
         
@@ -335,7 +386,11 @@ export default {
   }
 }
 
-.dropdown:hover .dropdown-menu {
+.dropdown-menu {
+  display: none;
+}
+
+.dropdown-menu.active {
   display: block;
 }
 </style>

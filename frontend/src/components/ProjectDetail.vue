@@ -297,7 +297,7 @@ export default {
     
     async updateProject() {
       try {
-        const response = await fetch(API_ROUTES.PROJECTS.GET_BY_ID(this.projectId), {
+        const response = await fetch(API_ROUTES.PROJECTS.UPDATE(this.projectId), {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'

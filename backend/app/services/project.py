@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import HTTPException
 from datetime import datetime
 
-from app.models.project import Project as ProjectModel
+from app.models.project import Project as ProjectModel, paper_project
 from app.models.paper import Paper as PaperModel
 from app.schemas.project import ProjectCreate, ProjectUpdate
 
@@ -71,28 +71,37 @@ def list_projects(db: Session, skip: int = 0, limit: int = 100) -> List[Dict]:
     """
     List all projects with paper counts.
     """
-    query = db.query(
-        ProjectModel, 
-        func.count(ProjectModel.papers).label('paper_count')
-    ).outerjoin(
-        ProjectModel.papers
-    ).group_by(
-        ProjectModel.id
-    ).offset(skip).limit(limit)
+    import logging
+    logger = logging.getLogger(__name__)
     
-    projects = []
-    for project, paper_count in query:
-        project_data = {
-            "id": project.id,
-            "name": project.name,
-            "description": project.description,
-            "created_at": project.created_at,
-            "updated_at": project.updated_at,
-            "paper_count": paper_count
-        }
-        projects.append(project_data)
-    
-    return projects
+    try:
+        # Get all projects with pagination
+        projects_query = db.query(ProjectModel).offset(skip).limit(limit).all()
+        logger.info(f"Found {len(projects_query)} projects in database")
+        
+        # Format the results with paper counts
+        projects = []
+        for project in projects_query:
+            # Simply count the number of papers directly using len()
+            paper_count = len(project.papers) if project.papers else 0
+            
+            logger.info(f"Project: id={project.id}, name={project.name}, paper_count={paper_count}")
+            
+            project_data = {
+                "id": project.id,
+                "name": project.name,
+                "description": project.description,
+                "created_at": project.created_at,
+                "updated_at": project.updated_at,
+                "paper_count": paper_count
+            }
+            projects.append(project_data)
+        
+        logger.info(f"Returning {len(projects)} projects")
+        return projects
+    except Exception as e:
+        logger.exception(f"Error in list_projects: {str(e)}")
+        return []  # Return empty list instead of letting the exception propagate
 
 
 def add_paper_to_project(db: Session, project_id: int, paper_id: int) -> ProjectModel:
