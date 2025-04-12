@@ -139,3 +139,46 @@ def remove_paper_from_project(db: Session, project_id: int, paper_id: int) -> Pr
     db.refresh(db_project)
     
     return db_project
+
+
+def add_papers_to_project_batch(db: Session, project_id: int, paper_ids: List[int]) -> Dict[str, Any]:
+    """
+    Add multiple papers to a project in a single batch operation.
+    
+    Args:
+        db: Database session
+        project_id: ID of the project to add papers to
+        paper_ids: List of paper IDs to add to the project
+        
+    Returns:
+        Dictionary with summary of the operation (added_count, skipped_count)
+    """
+    db_project = get_project_by_id(db, project_id)
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    added_count = 0
+    skipped_count = 0
+    
+    # Get all papers in a single query for efficiency
+    papers = db.query(PaperModel).filter(PaperModel.id.in_(paper_ids)).all()
+    
+    # Create a set of IDs of papers already in the project for fast lookup
+    existing_paper_ids = {paper.id for paper in db_project.papers}
+    
+    # Add papers that are not already in the project
+    for paper in papers:
+        if paper.id not in existing_paper_ids:
+            db_project.papers.append(paper)
+            added_count += 1
+        else:
+            skipped_count += 1
+    
+    db.commit()
+    db.refresh(db_project)
+    
+    return {
+        "added_count": added_count,
+        "skipped_count": skipped_count,
+        "total_papers": len(db_project.papers)
+    }

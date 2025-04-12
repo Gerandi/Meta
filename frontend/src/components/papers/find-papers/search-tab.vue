@@ -28,20 +28,13 @@
 
       <!-- Filters Panel -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        <!-- Databases -->
+        <!-- Database - OpenAlex Only -->
         <div>
-          <div class="mb-2 text-sm font-medium">Databases</div>
-          <select
-            :value="filters.database"
-            @input="updateFilter('database', $event.target.value)"
-            class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-          >
-            <option value="all">All Databases</option>
-            <option value="pubmed">PubMed</option>
-            <option value="crossref">Crossref</option>
-            <option value="semanticscholar">Semantic Scholar</option>
-            <option value="openalex">OpenAlex</option>
-          </select>
+          <div class="mb-2 text-sm font-medium">Database</div>
+          <div class="w-full border rounded-lg p-2 bg-gray-100 text-gray-700">
+            OpenAlex
+            <span class="text-xs text-gray-500 block mt-1">Comprehensive academic paper index</span>
+          </div>
         </div>
 
         <!-- Year Range -->

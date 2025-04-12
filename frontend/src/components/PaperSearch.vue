@@ -206,15 +206,13 @@ export default {
       activeTab: 'search',
       searchQuery: '',
       filters: {
-        database: 'openalex',
         yearFrom: null,
         yearTo: null,
         studyType: '',
         sortBy: 'relevance',
         journal: '',
         author: '',
-        openAccessOnly: false,
-        providers: ['openalex']
+        openAccessOnly: false
       },
       selectedPapers: [],
       selectedImportedPapers: [],
@@ -241,6 +239,7 @@ export default {
       projects: [],
       selectedProjectId: '',
       showCreateProjectForm: false,
+      papersToAddToProject: [], // Stores imported papers with their database IDs
       newProject: {
         name: '',
         description: ''
@@ -327,7 +326,7 @@ export default {
       this.error = null;
       
       try {
-        // Build query parameters for simple search
+        // Build query parameters for search
         const params = new URLSearchParams();
         params.append('query', this.searchQuery);
         params.append('per_page', this.itemsPerPage.toString());
@@ -404,7 +403,7 @@ export default {
            this.error = `No results found for "${this.searchQuery}". Try different search terms or remove some filters.`;
         }
         
-        // Reset selection
+        // Reset selection when performing a new search (not just pagination)
         this.selectedPapers = [];
         this.allSelected = false;
       } catch (err) {
@@ -425,15 +424,13 @@ export default {
     
     clearFilters() {
       this.filters = {
-        database: 'openalex',
         yearFrom: null,
         yearTo: null,
         studyType: '',
         sortBy: 'relevance',
         journal: '',
         author: '',
-        openAccessOnly: false,
-        providers: ['openalex']
+        openAccessOnly: false
       };
       
       // Reset pagination
@@ -834,36 +831,50 @@ export default {
     },
     
     async addPapersToProject() {
-      if (!this.selectedProjectId || this.selectedImportedPapers.length === 0) return;
+      if (!this.selectedProjectId || this.papersToAddToProject.length === 0) {
+        alert('Please select a project and papers to add');
+        return;
+      }
       
       try {
-        console.log(`Adding ${this.selectedImportedPapers.length} papers to project ${this.selectedProjectId}`);
+        console.log(`Adding ${this.papersToAddToProject.length} papers to project ${this.selectedProjectId}`);
         
-        // Try projects API first
+        // Extract just the IDs from the papersToAddToProject array
+        const paperIds = this.papersToAddToProject.map(paper => paper.id);
+        
+        // Try the batch API endpoint for projects first
         let response = null;
         let useCollections = false;
         
         try {
-          response = await fetch(`${API_ROUTES.PROJECTS.ADD_PAPERS}/${this.selectedProjectId}`, {
+          response = await fetch(`${API_ROUTES.PROJECTS.ADD_PAPERS_BATCH(this.selectedProjectId)}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ paper_ids: this.selectedImportedPapers })
+            body: JSON.stringify({ paper_ids: paperIds })
           });
           
           if (!response.ok) {
             useCollections = true;
+          } else {
+            // Handle successful project batch API response
+            const result = await response.json();
+            console.log('Project batch API result:', result);
+            alert(`${result.added_count || 0} paper(s) added to project successfully. ${result.skipped_count || 0} were already in the project.`);
+            this.showProjectModal = false;
+            this.papersToAddToProject = [];
+            return;
           }
         } catch (e) {
-          console.log('Project API not available, trying collections API');
+          console.log('Project batch API not available, trying collections API');
           useCollections = true;
         }
         
-        // If project API fails, try collections API
+        // If project batch API fails, try collections API
         if (useCollections) {
           console.log('Using collections API instead');
-          const promises = this.selectedImportedPapers.map(paperId => {
+          const promises = paperIds.map(paperId => {
             return fetch(`${API_ROUTES.COLLECTIONS.ADD_PAPER(this.selectedProjectId, paperId)}`, {
               method: 'POST',
               headers: {
@@ -881,15 +892,8 @@ export default {
           
           alert(`${successCount} paper(s) added to collection successfully.`);
           this.showProjectModal = false;
-          this.selectedImportedPapers = [];
-          return;
+          this.papersToAddToProject = [];
         }
-        
-        // Handle response from projects API
-        const result = await response.json();
-        alert(`${result.added_count || this.selectedImportedPapers.length} paper(s) added to project successfully.`);
-        this.showProjectModal = false;
-        this.selectedImportedPapers = [];
       } catch (error) {
         console.error('Error adding papers to project:', error);
         alert('There was a problem adding papers to the project: ' + error.message);
@@ -940,10 +944,19 @@ export default {
         const result = await response.json();
         console.log('Import result:', result);
         
-        alert(`${result.imported_count || 0} paper(s) imported successfully.`);
+        // Store the imported papers with their database IDs
+        this.papersToAddToProject = result.imported_papers || [];
         
-        // Refresh imported papers to show real data
-        await this.fetchImportedPapers();
+        if (this.papersToAddToProject.length > 0) {
+          // Open the project selection modal
+          this.showProjectModal = true;
+          alert(`${result.imported_count || 0} paper(s) imported successfully.`);
+          
+          // Refresh imported papers to show real data
+          await this.fetchImportedPapers();
+        } else {
+          alert('No papers were successfully imported. Please try again.');
+        }
         
         // Clear selection
         this.selectedPapers = [];

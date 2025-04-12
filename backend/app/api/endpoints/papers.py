@@ -347,11 +347,16 @@ async def import_papers_batch(
     
     This endpoint accepts a list of paper objects and stores them in the database,
     consolidating duplicates based on DOI or title similarity.
+    
+    Returns:
+        A dictionary containing import status, counts, and the list of successfully imported papers
+        with their database IDs.
     """
     try:
         imported_count = 0
         skipped_count = 0
         errors = []
+        imported_papers = []
         
         for paper_data in papers:
             try:
@@ -362,6 +367,15 @@ async def import_papers_batch(
                 created_paper = create_paper(db, paper_create)
                 
                 if created_paper:
+                    # Add the successfully created/found paper to our result list
+                    imported_papers.append({
+                        "id": created_paper.id,
+                        "title": created_paper.title,
+                        "doi": created_paper.doi,
+                        "authors": created_paper.authors,
+                        "journal": created_paper.journal,
+                        "publication_date": created_paper.publication_date
+                    })
                     imported_count += 1
                 else:
                     skipped_count += 1
@@ -378,7 +392,8 @@ async def import_papers_batch(
             "status": "success",
             "imported_count": imported_count,
             "skipped_count": skipped_count,
-            "errors": errors
+            "errors": errors,
+            "imported_papers": imported_papers
         }
     
     except Exception as e:

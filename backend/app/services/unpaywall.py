@@ -3,7 +3,7 @@ import logging
 from typing import Dict, Any, Optional
 
 from app.core.config import settings
-from app.services.api_client import get_unpaywall_data
+from app.services.unpaywall_client import get_unpaywall_data
 
 logger = logging.getLogger(__name__)
 

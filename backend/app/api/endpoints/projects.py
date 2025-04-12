@@ -1,17 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
-from typing import List, Dict
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status, Body
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from app.schemas.project import Project, ProjectCreate, ProjectUpdate, ProjectWithPaperCount
 from app.schemas.paper import Paper
 from app.services.project import (
     create_project, get_project_by_id, update_project, 
     delete_project, list_projects, add_paper_to_project,
-    remove_paper_from_project
+    remove_paper_from_project, add_papers_to_project_batch
 )
 from app.db.session import get_db
 
 router = APIRouter()
+
+
+# Define a payload model for batch paper IDs
+class PaperIdsPayload(BaseModel):
+    paper_ids: List[int]
 
 
 @router.post("/", response_model=Project, status_code=status.HTTP_201_CREATED)
@@ -85,6 +91,20 @@ async def add_paper_to_project_by_id(
     Add a paper to a project.
     """
     return add_paper_to_project(db, project_id, paper_id)
+
+
+@router.post("/{project_id}/papers/batch", response_model=Dict[str, Any])
+async def add_papers_to_project_batch_endpoint(
+    project_id: int = Path(..., description="The ID of the project"),
+    payload: PaperIdsPayload = Body(..., description="List of paper IDs to add to the project"),
+    db: Session = Depends(get_db)
+):
+    """
+    Add multiple papers to a project in a single batch operation.
+    
+    This is more efficient than adding papers one by one when adding multiple papers.
+    """
+    return add_papers_to_project_batch(db, project_id, payload.paper_ids)
 
 
 @router.delete("/{project_id}/papers/{paper_id}", response_model=Project)

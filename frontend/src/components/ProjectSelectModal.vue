@@ -184,7 +184,6 @@ export default {
     async addToProject() {
       try {
         let projectId = this.selectedProjectId;
-        let addedPapers = [];
         
         // If we're creating a new project, do that first
         if (this.showCreateForm) {
@@ -214,12 +213,41 @@ export default {
           throw new Error('No project selected');
         }
         
-        // Process each paper
-        for (const paper of this.papers) {
+        // Check if the papers already have IDs (i.e., they were already imported to the database)
+        const papersWithIds = this.papers.filter(paper => paper && paper.id);
+        const papersWithoutIds = this.papers.filter(paper => paper && !paper.id);
+        
+        // For papers that already have IDs, use the batch endpoint
+        if (papersWithIds.length > 0) {
+          const paperIds = papersWithIds.map(paper => paper.id);
+          
+          // Use the batch endpoint to add all papers at once
+          const batchResponse = await fetch(API_ROUTES.PROJECTS.ADD_PAPERS_BATCH(projectId), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ paper_ids: paperIds })
+          });
+          
+          if (!batchResponse.ok) {
+            const errorData = await batchResponse.json();
+            console.error('Batch add response:', errorData);
+            throw new Error(errorData.detail || 'Failed to add papers to project');
+          }
+          
+          const batchResult = await batchResponse.json();
+          console.log('Batch add result:', batchResult);
+        }
+        
+        // For papers that don't have IDs yet, we need to save them first
+        const addedPapers = [];
+        
+        for (const paper of papersWithoutIds) {
           // Skip if paper is null
           if (!paper) continue;
           
-          console.log('Adding paper to project:', paper.title);
+          console.log('Saving paper first:', paper.title);
           
           // Check and prepare the paper data
           const paperData = {
@@ -268,7 +296,7 @@ export default {
         
         // Close the modal and emit success event
         this.$emit('paper-added', {
-          papers: addedPapers,
+          papers: [...papersWithIds, ...addedPapers],
           projectId: projectId
         });
         

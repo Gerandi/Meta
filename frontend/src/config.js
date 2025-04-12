@@ -23,6 +23,7 @@ export const API_ROUTES = {
         UPDATE: (id) => `${API_BASE_URL}/projects/${id}`,
         DELETE: (id) => `${API_BASE_URL}/projects/${id}`,
         ADD_PAPERS: (projectId) => `${API_BASE_URL}/projects/${projectId}/papers`,
+        ADD_PAPERS_BATCH: (projectId) => `${API_BASE_URL}/projects/${projectId}/papers/batch`,
         REMOVE_PAPER: (projectId, paperId) => `${API_BASE_URL}/projects/${projectId}/papers/${paperId}`,
         GET_PAPERS: (projectId) => `${API_BASE_URL}/projects/${projectId}/papers`,
     },

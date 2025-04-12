@@ -92,19 +92,23 @@ async def search_papers_direct(
         # Build filters
         filters = []
         
-        # Year filters
-        if year_from:
+        # Year filters - ensure valid year ranges
+        if year_from and isinstance(year_from, int) and year_from > 0:
             filters.append(f"publication_year:>{year_from-1}")
-        if year_to:
+        if year_to and isinstance(year_to, int) and year_to > 0:
             filters.append(f"publication_year:<{year_to+1}")
             
-        # Journal filter
-        if journal:
-            filters.append(f"host_venue.display_name.search:{journal}")
+        # Journal filter - sanitize input
+        if journal and isinstance(journal, str) and journal.strip():
+            # Remove any characters that might cause issues with the API
+            safe_journal = journal.strip().replace('"', '').replace(':', '')
+            filters.append(f"host_venue.display_name.search:{safe_journal}")
             
-        # Author filter
-        if author:
-            filters.append(f"author.display_name.search:{author}")
+        # Author filter - sanitize input
+        if author and isinstance(author, str) and author.strip():
+            # Remove any characters that might cause issues with the API
+            safe_author = author.strip().replace('"', '').replace(':', '')
+            filters.append(f"author.display_name.search:{safe_author}")
             
         # Open access filter
         if open_access_only:
