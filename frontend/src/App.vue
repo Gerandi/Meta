@@ -5,35 +5,45 @@
       :activeProject="activeProject"
       @change-view="setActiveView" 
       @set-active-project="setActiveProject"
+      ref="sidebar"
     />
-    <div class="flex-1 overflow-auto">
-      <div v-if="needsProject && !activeProject" class="p-6 text-center">
-        <div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
-          <font-awesome-icon icon="folder-open" class="text-gray-400 text-5xl mb-4" />
-          <h2 class="text-xl font-medium mb-4">Please Select a Project</h2>
-          <p class="text-gray-600 mb-6">You need to select or create a project before you can access this page.</p>
-          <div class="flex justify-center space-x-4">
-            <button 
-              class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
-              @click="setActiveView('projects')"
-            >
-              Go to Projects
-            </button>
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <!-- Top Bar for Active Project -->
+      <div v-if="activeProject" class="bg-indigo-100 text-indigo-800 px-4 py-1.5 text-sm border-b border-indigo-200">
+        <span>Active Project: <strong>{{ activeProject.name }}</strong></span>
+      </div>
+      
+      <div class="flex-1 overflow-auto">
+        <div v-if="needsProject && !activeProject" class="p-6 text-center">
+          <div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
+            <font-awesome-icon icon="folder-open" class="text-gray-400 text-5xl mb-4" />
+            <h2 class="text-xl font-medium mb-4">Please Select a Project</h2>
+            <p class="text-gray-600 mb-6">You need to select or create a project before you can access this page.</p>
+            <div class="flex justify-center space-x-4">
+              <button 
+                class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+                @click="setActiveView('projects')"
+              >
+                Go to Projects
+              </button>
+            </div>
           </div>
         </div>
+        <component 
+          v-else
+          :is="currentView" 
+          v-bind="componentProps"
+          @select-paper="handleSelectPaper"
+          @view-project="handleViewProject"
+          @set-active-project="setActiveProject"
+          @clear-active-project="clearActiveProject"
+          @change-view="setActiveView"
+          @process-papers="handleProcessPapers"
+          @add-to-project="showProjectSelectModal"
+          @request-confirmation="showConfirmation"
+          @project-list-changed="refreshProjectList"
+        />
       </div>
-      <component 
-        v-else
-        :is="currentView" 
-        v-bind="componentProps"
-        @select-paper="handleSelectPaper"
-        @view-project="handleViewProject"
-        @set-active-project="setActiveProject"
-        @clear-active-project="clearActiveProject"
-        @change-view="setActiveView"
-        @process-papers="handleProcessPapers"
-        @add-to-project="showProjectSelectModal"
-      />
     </div>
   </div>
   <!-- Add ProjectSelectModal -->
@@ -42,6 +52,16 @@
     :papers="paperForProjectModal"
     @close="isProjectModalVisible = false"
     @paper-added="handlePaperAddedToProject"
+  />
+  <!-- Add ConfirmationModal -->
+  <ConfirmationModal
+    :show="confirmationState.show"
+    :title="confirmationState.title"
+    :message="confirmationState.message"
+    :confirmText="confirmationState.confirmText"
+    :cancelText="confirmationState.cancelText"
+    @confirm="handleConfirmationConfirm"
+    @cancel="handleConfirmationCancel"
   />
 </template>
 
@@ -56,6 +76,7 @@ import ResultsTable from './components/ResultsTable.vue';
 import Projects from './components/Projects.vue';
 import ProjectDetail from './components/ProjectDetail.vue';
 import ProjectSelectModal from './components/ProjectSelectModal.vue';
+import ConfirmationModal from './components/ConfirmationModal.vue';
 import { API_ROUTES } from './config.js';
 
 export default {
@@ -70,7 +91,8 @@ export default {
     ResultsTable,
     Projects,
     ProjectDetail,
-    ProjectSelectModal
+    ProjectSelectModal,
+    ConfirmationModal
   },
   data() {
     return {
@@ -80,7 +102,16 @@ export default {
       selectedPapers: [], // Add selected papers array to store across navigation
       activeProject: null,
       isProjectModalVisible: false,
-      paperForProjectModal: null
+      paperForProjectModal: null,
+      // Confirmation Modal State
+      confirmationState: {
+        show: false,
+        title: '',
+        message: '',
+        confirmText: 'Confirm',
+        cancelText: 'Cancel',
+        onConfirm: null // Callback function
+      }
     }
   },
   computed: {
@@ -216,6 +247,46 @@ export default {
       console.log(`${event.papers.length} paper(s) added to project ${event.projectId}`);
       // Optionally show a success message
       this.isProjectModalVisible = false; // Close modal
+    },
+    
+    // Confirmation Modal Methods
+    showConfirmation({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', onConfirm }) {
+      this.confirmationState.title = title;
+      this.confirmationState.message = message;
+      this.confirmationState.confirmText = confirmText;
+      this.confirmationState.cancelText = cancelText;
+      this.confirmationState.onConfirm = onConfirm; // Store the callback
+      this.confirmationState.show = true;
+    },
+    
+    handleConfirmationConfirm() {
+      if (typeof this.confirmationState.onConfirm === 'function') {
+        this.confirmationState.onConfirm(); // Execute the stored callback
+      }
+      this.resetConfirmationState();
+    },
+    
+    handleConfirmationCancel() {
+      this.resetConfirmationState();
+    },
+    
+    resetConfirmationState() {
+      this.confirmationState = {
+        show: false,
+        title: '',
+        message: '',
+        confirmText: 'Confirm',
+        cancelText: 'Cancel',
+        onConfirm: null
+      };
+    },
+
+    // Method to refresh project list in sidebar
+    refreshProjectList() {
+      console.log('Project list changed, refreshing sidebar...');
+      if (this.$refs.sidebar) {
+        this.$refs.sidebar.fetchProjects();
+      }
     }
   },
   mounted() {

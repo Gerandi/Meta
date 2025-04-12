@@ -1,30 +1,28 @@
 <template>
-  <div class="w-64 bg-indigo-800 text-white p-4">
+  <div class="w-64 bg-indigo-800 text-white p-4 flex flex-col h-full">
     <div class="text-xl font-bold mb-4 pl-2">MetaReview</div>
     
-    <!-- Active Project Selector -->
-    <div class="mb-6 pl-2">
-      <div class="text-sm text-indigo-300 mb-1">Active Project:</div>
-      <div v-if="activeProject" class="flex items-center justify-between bg-indigo-900 p-2 rounded">
-        <div class="text-sm font-medium truncate">{{ activeProject.name }}</div>
-        <button 
-          class="text-indigo-300 hover:text-white"
-          @click="showProjectSelector = true"
+    <!-- Active Project Dropdown Selector -->
+    <div class="mb-6 px-2">
+      <div class="relative">
+        <select
+          id="project-select"
+          v-model="selectedProjectId"
+          @change="handleProjectChange"
+          class="w-full bg-white border border-gray-300 text-black rounded p-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 appearance-none"
         >
-          <font-awesome-icon icon="exchange-alt" />
-        </button>
+          <option :value="null" disabled>Select a Project</option>
+          <option v-for="project in projects" :key="project.id" :value="project.id">
+            {{ project.name }}
+          </option>
+          <option value="manage" class="font-medium">⚙️ Manage Projects</option>
+        </select>
       </div>
-      <div v-else class="bg-indigo-900 p-2 rounded text-center">
-        <button 
-          class="text-sm text-indigo-300 hover:text-white"
-          @click="showProjectSelector = true"
-        >
-          Select a project <font-awesome-icon icon="arrow-right" class="ml-1" />
-        </button>
-      </div>
+      <div v-if="isLoading" class="text-xs text-indigo-300 mt-1">Loading projects...</div>
+      <div v-if="error" class="text-xs text-red-400 mt-1">Error loading projects</div>
     </div>
     
-    <nav>
+    <nav class="flex-grow">
       <SidebarItem 
         icon="th-large" 
         text="Dashboard" 
@@ -81,68 +79,7 @@
       />
     </nav>
     
-    <!-- Project Selector Modal -->
-    <div v-if="showProjectSelector" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md text-gray-800">
-        <h2 class="text-xl font-bold mb-4">Select Active Project</h2>
-        
-        <div v-if="projects.length === 0" class="mb-4 p-4 bg-gray-50 rounded text-center">
-          <p class="text-gray-500 mb-2">You don't have any projects yet.</p>
-          <button 
-            class="text-indigo-600 hover:text-indigo-800 font-medium"
-            @click="goToProjects"
-          >
-            Create your first project
-          </button>
-        </div>
-        
-        <div v-else class="mb-6">
-          <div class="max-h-60 overflow-y-auto border rounded-lg divide-y">
-            <div 
-              v-for="project in projects" 
-              :key="project.id"
-              class="p-3 hover:bg-gray-50 cursor-pointer"
-              @click="selectProject(project)"
-            >
-              <div class="flex items-center">
-                <div class="mr-2">
-                  <input 
-                    type="radio" 
-                    :checked="selectedProjectId === project.id"
-                    class="form-radio h-4 w-4 text-indigo-600"
-                  />
-                </div>
-                <div>
-                  <div class="font-medium">{{ project.name }}</div>
-                  <div v-if="project.description" class="text-sm text-gray-500">
-                    {{ project.description }}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="flex justify-end">
-          <button 
-            class="text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-100 mr-2"
-            @click="showProjectSelector = false"
-          >
-            Cancel
-          </button>
-          <button 
-            v-if="projects.length > 0"
-            class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
-            @click="applyProjectSelection"
-            :disabled="!selectedProjectId"
-          >
-            Select
-          </button>
-        </div>
-      </div>
-    </div>
-    
-    <div class="mt-auto pt-4 border-t border-indigo-700 mt-8">
+    <div class="mt-auto pt-4 border-t border-indigo-700">
       <div class="flex items-center p-2 rounded hover:bg-indigo-700 cursor-pointer">
         <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center mr-2">
           JD
@@ -177,87 +114,109 @@ export default {
   },
   data() {
     return {
-      showProjectSelector: false,
       projects: [],
       selectedProjectId: null,
       isLoading: false,
-      error: null
+      error: null,
+      previousSelectedId: null // To store previous selection
+    }
+  },
+  watch: {
+    // Update local selection when prop changes
+    activeProject(newVal) {
+      this.selectedProjectId = newVal ? newVal.id : null;
+      // Store as previous selection too
+      if (newVal) {
+        this.previousSelectedId = newVal.id;
+      }
+    },
+    
+    // Handle special "manage" option
+    selectedProjectId(newVal) {
+      if (newVal === 'manage') {
+        this.goToProjects();
+        // Restore previous selection to avoid the dropdown staying on "Manage Projects"
+        this.$nextTick(() => {
+          this.selectedProjectId = this.previousSelectedId || null;
+        });
+      } else if (newVal !== null) {
+        this.previousSelectedId = newVal;
+      }
     }
   },
   mounted() {
-    // If there's an active project, set it as selected
-    if (this.activeProject) {
-      this.selectedProjectId = this.activeProject.id;
+    this.selectedProjectId = this.activeProject ? this.activeProject.id : null;
+    if (this.selectedProjectId) {
+      this.previousSelectedId = this.selectedProjectId;
     }
+    this.fetchProjects();
   },
   methods: {
     changeView(view) {
       // If no active project and trying to access a protected view, show project selector
       const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'resultsTable'];
       if (!this.activeProject && protectedViews.includes(view)) {
-        this.showProjectSelector = true;
-        return;
+         console.warn("Cannot navigate: No active project selected.");
+         return;
       }
-      
       this.$emit('change-view', view);
     },
-    
+
     async fetchProjects() {
       this.isLoading = true;
       this.error = null;
-      
       try {
         const response = await fetch(API_ROUTES.PROJECTS.LIST);
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to load projects');
-        }
-        
+        if (!response.ok) throw new Error('Failed to load projects');
         this.projects = await response.json();
-        
-        // If there are projects and no selection, select the first one by default
-        if (this.projects.length > 0 && !this.selectedProjectId) {
-          this.selectedProjectId = this.projects[0].id;
-        }
       } catch (err) {
         this.error = err.message;
-        console.error('Error fetching projects:', err);
+        console.error('Error fetching projects for sidebar:', err);
       } finally {
         this.isLoading = false;
       }
     },
-    
-    selectProject(project) {
-      this.selectedProjectId = project.id;
-    },
-    
-    applyProjectSelection() {
+
+    handleProjectChange() {
+      if (this.selectedProjectId === 'manage') {
+        return; // This is handled by the watcher
+      }
+      
       const selectedProject = this.projects.find(p => p.id === this.selectedProjectId);
       if (selectedProject) {
         this.$emit('set-active-project', selectedProject);
-        this.showProjectSelector = false;
       }
     },
-    
+
     goToProjects() {
-      this.showProjectSelector = false;
       this.$emit('change-view', 'projects');
-    }
-  },
-  watch: {
-    showProjectSelector(newVal) {
-      if (newVal) {
-        this.fetchProjects();
-      }
-    },
-    activeProject(newVal) {
-      if (newVal) {
-        this.selectedProjectId = newVal.id;
-      } else {
-        this.selectedProjectId = null;
-      }
     }
   }
 }
 </script>
+
+<style scoped>
+/* Add custom styles for the select dropdown arrow */
+select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23000000' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem; /* Make space for the arrow */
+}
+/* Hide default arrow in Firefox */
+select::-moz-focus-inner {
+  border: 0;
+}
+/* Hide default arrow in IE/Edge */
+select::-ms-expand {
+  display: none;
+}
+
+/* Option styling */
+select option {
+  padding: 10px;
+  background-color: white;
+  color: black;
+}
+</style>

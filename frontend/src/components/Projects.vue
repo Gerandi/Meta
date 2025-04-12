@@ -37,16 +37,16 @@
       <div 
         v-for="project in projects" 
         :key="project.id"
-        class="bg-white rounded-lg shadow overflow-hidden hover:shadow-md transition-shadow duration-200"
+        class="bg-white rounded-lg shadow overflow-visible hover:shadow-md transition-shadow duration-200"
       >
-        <div class="p-6">
+        <div class="p-6 min-h-[180px] flex flex-col">
           <div class="flex justify-between items-start">
             <h3 class="text-xl font-semibold mb-2">{{ project.name }}</h3>
             <div class="dropdown relative">
-              <button class="text-gray-500 hover:text-gray-700" @click.stop="toggleDropdown($event)">
+              <button class="text-gray-500 hover:text-gray-700 p-1" @click.stop="toggleDropdown($event)">
                 <font-awesome-icon icon="ellipsis-v" />
               </button>
-              <div class="dropdown-menu absolute right-0 mt-2 bg-white rounded-lg shadow-lg p-2 z-10">
+              <div class="dropdown-menu absolute right-0 mt-1 bg-white rounded-lg shadow-lg p-2 z-50 border">
                 <button 
                   class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
                   @click="setActiveProject(project)"
@@ -60,7 +60,7 @@
                   Edit
                 </button>
                 <button 
-                  class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 rounded"
+                  class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded"
                   @click="confirmDelete(project)"
                 >
                   Delete
@@ -68,9 +68,9 @@
               </div>
             </div>
           </div>
-          <p v-if="project.description" class="text-gray-600 mb-4">{{ project.description }}</p>
-          <p v-else class="text-gray-500 italic mb-4">No description</p>
-          <div class="flex justify-between items-center">
+          <p v-if="project.description" class="text-gray-600 mb-4 flex-grow">{{ project.description }}</p>
+          <p v-else class="text-gray-500 italic mb-4 flex-grow">No description</p>
+          <div class="flex justify-between items-center mt-auto">
             <span class="text-sm text-gray-500">
               {{ project.paper_count }} {{ project.paper_count === 1 ? 'paper' : 'papers' }}
             </span>
@@ -129,29 +129,6 @@
         </div>
       </div>
     </div>
-    
-    <!-- Delete Confirmation Modal -->
-    <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-        <h2 class="text-xl font-bold mb-4">Confirm Deletion</h2>
-        <p class="mb-6">Are you sure you want to delete the project "{{ projectToDelete?.name }}"? This action cannot be undone.</p>
-        
-        <div class="flex justify-end">
-          <button 
-            class="text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-100 mr-2"
-            @click="showDeleteModal = false"
-          >
-            Cancel
-          </button>
-          <button 
-            class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
-            @click="deleteProject"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -160,6 +137,7 @@ import { API_ROUTES } from '../config.js';
 
 export default {
   name: 'Projects',
+  emits: ['view-project', 'set-active-project', 'clear-active-project', 'request-confirmation', 'project-list-changed'],
   data() {
     return {
       projects: [],
@@ -167,13 +145,11 @@ export default {
       error: null,
       showCreateModal: false,
       showEditModal: false,
-      showDeleteModal: false,
       formData: {
         name: '',
         description: ''
       },
-      editingProjectId: null,
-      projectToDelete: null
+      editingProjectId: null
     }
   },
   mounted() {
@@ -268,8 +244,13 @@ export default {
     },
     
     confirmDelete(project) {
-      this.projectToDelete = project;
-      this.showDeleteModal = true;
+      // Use the centralized confirmation modal instead of local one
+      this.$emit('request-confirmation', {
+        title: 'Delete Project',
+        message: `Are you sure you want to delete the project "${project.name}"? This action cannot be undone and will permanently delete all associated papers, coding data, and results within this project.`,
+        confirmText: 'Delete Project',
+        onConfirm: () => this.deleteProject(project.id)
+      });
     },
     
     closeModal() {
@@ -324,6 +305,9 @@ export default {
         console.log('Refreshing projects list after save...');
         await this.fetchProjects();
         
+        // Emit event to notify parent components about project list change
+        this.$emit('project-list-changed');
+        
         // Close modal
         this.closeModal();
       } catch (err) {
@@ -332,20 +316,20 @@ export default {
       }
     },
     
-    async deleteProject() {
+    async deleteProject(projectId) {
       try {
-        const response = await fetch(API_ROUTES.PROJECTS.DELETE(this.projectToDelete.id), {
+        const response = await fetch(API_ROUTES.PROJECTS.DELETE(projectId), {
           method: 'DELETE'
         });
         
         if (!response.ok) {
-          const errorData = await response.json();
+          const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.detail || 'Failed to delete project');
         }
         
         // If this was the active project, clear it
         const activeProjectId = localStorage.getItem('activeProjectId');
-        if (activeProjectId && parseInt(activeProjectId) === this.projectToDelete.id) {
+        if (activeProjectId && parseInt(activeProjectId) === projectId) {
           localStorage.removeItem('activeProjectId');
           localStorage.removeItem('activeProjectName');
           this.$emit('clear-active-project');
@@ -354,9 +338,8 @@ export default {
         // Refresh projects list
         await this.fetchProjects();
         
-        // Close modal
-        this.showDeleteModal = false;
-        this.projectToDelete = null;
+        // Emit event to notify parent components about project list change
+        this.$emit('project-list-changed');
       } catch (err) {
         console.error('Error deleting project:', err);
         alert('Error: ' + err.message);
@@ -388,9 +371,25 @@ export default {
 
 .dropdown-menu {
   display: none;
+  transform: translateX(0);
+  right: 0;
+  top: 100%;
+  min-width: 140px;
+  max-width: 200px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.dropdown {
+  position: relative;
+  z-index: 30; /* Ensure dropdown container has a higher z-index */
 }
 
 .dropdown-menu.active {
   display: block;
+}
+
+/* Override any potential overflow hidden settings that might clip the dropdown */
+.overflow-visible {
+  overflow: visible !important;
 }
 </style>
