@@ -8,12 +8,20 @@
         <font-awesome-icon icon="arrow-left" class="mr-1" /> Back to Projects
       </button>
       <h1 class="text-2xl font-bold flex-grow">{{ project.name }}</h1>
-      <button 
-        class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
-        @click="showEditModal = true"
-      >
-        <font-awesome-icon icon="edit" class="mr-1" /> Edit
-      </button>
+      <div class="flex space-x-2">
+        <button 
+          class="flex items-center bg-white border text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-50"
+          @click="configureCodingSheet"
+        >
+          <font-awesome-icon icon="clipboard-list" class="mr-1" /> Configure Coding Sheet
+        </button>
+        <button 
+          class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+          @click="showEditModal = true"
+        >
+          <font-awesome-icon icon="edit" class="mr-1" /> Edit
+        </button>
+      </div>
     </div>
     
     <div v-if="project.description" class="bg-gray-50 p-4 rounded-lg mb-6">
@@ -177,7 +185,8 @@ export default {
       project: {
         id: null,
         name: '',
-        description: ''
+        description: '',
+        codingSheet: null
       },
       papers: [],
       isLoading: false,
@@ -261,6 +270,12 @@ export default {
     
     goToSearch() {
       this.$emit('change-view', 'search');
+    },
+    
+    configureCodingSheet() {
+      // Emit an event that will be caught by the parent component to navigate to the coding sheet configuration
+      // Pass the project ID so we know which project's coding sheet to configure
+      this.$emit('configure-coding-sheet', this.project.id);
     },
     
     viewPaper(paper) {

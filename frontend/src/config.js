@@ -37,6 +37,11 @@ export const API_ROUTES = {
     CODING: {
         CREATE: `${API_BASE_URL}/coding`,
         GET_BY_ID: (id) => `${API_BASE_URL}/coding/${id}`,
+        UPDATE: (id) => `${API_BASE_URL}/coding/${id}`,
+        DELETE: (id) => `${API_BASE_URL}/coding/${id}`,
+        GET_BY_PROJECT_ID: (projectId) => `${API_BASE_URL}/coding/project/${projectId}`,
+        GET_FOR_PAPER: (paperId) => `${API_BASE_URL}/coding/paper/${paperId}`,
+        SAVE_PAPER_CODING: `${API_BASE_URL}/coding/paper`,
     },
     RESULTS: {
         GENERATE: `${API_BASE_URL}/results/generate`,

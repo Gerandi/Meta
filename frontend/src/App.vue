@@ -42,6 +42,8 @@
           @add-to-project="showProjectSelectModal"
           @request-confirmation="showConfirmation"
           @project-list-changed="refreshProjectList"
+          @configure-coding-sheet="configureCodingSheet"
+          @back-to-project="handleBackToProject"
         />
       </div>
     </div>
@@ -139,10 +141,21 @@ export default {
     },
     componentProps() {
       if (this.activeView === 'viewer' && this.selectedPaper) {
-        return { paper: this.selectedPaper };
+        return { 
+          paper: this.selectedPaper,
+          projectId: this.activeProject ? this.activeProject.id : null 
+        };
       }
       if (this.activeView === 'projectDetail' && this.selectedProjectId) {
         return { projectId: this.selectedProjectId };
+      }
+      
+      if (this.activeView === 'codingSheet' && this.selectedProjectId) {
+        return { projectId: this.selectedProjectId };
+      }
+      
+      if (this.activeView === 'resultsTable' && this.activeProject) {
+        return { projectId: this.activeProject.id };
       }
       if (this.activeView === 'processing') {
         return { selectedPapers: this.selectedPapers };
@@ -177,8 +190,47 @@ export default {
     },
     
     handleViewProject(projectId) {
-      this.selectedProjectId = projectId;
+      if (!projectId && this.activeProject) {
+        // If no projectId is provided but there's an active project, use that
+        this.selectedProjectId = this.activeProject.id;
+      } else {
+        this.selectedProjectId = projectId;
+      }
+      
+      console.log('Setting project detail view with project ID:', this.selectedProjectId);
       this.activeView = 'projectDetail';
+    },
+    
+    configureCodingSheet(projectId) {
+      if (!projectId && this.activeProject) {
+        // If no projectId provided, use active project
+        this.selectedProjectId = this.activeProject.id;
+      } else {
+        this.selectedProjectId = projectId;
+      }
+      
+      if (!this.selectedProjectId) {
+        console.error('No project ID available for coding sheet configuration');
+        return;
+      }
+      
+      console.log('Configuring coding sheet for project ID:', this.selectedProjectId);
+      this.activeView = 'codingSheet';
+    },
+    
+    handleBackToProject() {
+      // Make sure we have a valid project ID
+      if (!this.selectedProjectId && this.activeProject) {
+        this.selectedProjectId = this.activeProject.id;
+      }
+      
+      if (!this.selectedProjectId) {
+        // If no project ID, go to projects list
+        this.activeView = 'projects';
+      } else {
+        // Return to the project detail view
+        this.activeView = 'projectDetail';
+      }
     },
     
     setActiveProject(project) {

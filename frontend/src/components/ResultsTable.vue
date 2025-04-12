@@ -100,8 +100,17 @@
 </template>
 
 <script>
+import { API_ROUTES } from '../config.js';
+
 export default {
   name: 'ResultsTable',
+  props: {
+    projectId: {
+      type: Number,
+      required: false,
+      default: null
+    }
+  },
   data() {
     return {
       loading: true,
@@ -117,9 +126,11 @@ export default {
         { name: 'pValue', label: 'p-value' }
       ],
       papers: [],
+      codedPapers: [],
       currentPage: 1,
       totalPages: 1,
-      totalDataPoints: 0
+      totalDataPoints: 0,
+      codingSheet: null
     }
   },
   mounted() {
@@ -132,37 +143,165 @@ export default {
       this.error = null;
       
       try {
-        // Mock data for now
-        setTimeout(() => {
-          // For MVP, just show empty state
+        if (!this.projectId) {
           this.papers = [];
           this.totalDataPoints = 0;
           this.loading = false;
-        }, 1000);
+          return;
+        }
+        
+        // First, get the project details and coding sheet
+        await this.loadCodingSheet();
+        
+        // Get all papers in the project
+        const papersResponse = await fetch(API_ROUTES.PROJECTS.GET_PAPERS(this.projectId));
+        if (!papersResponse.ok) {
+          throw new Error('Failed to load papers for this project');
+        }
+        
+        const papers = await papersResponse.json();
+        this.papers = papers;
+        
+        // Now get coding data for all papers
+        await this.loadCodingData();
+        
+        // Count data points
+        this.calculateTotalDataPoints();
+        this.loading = false;
       } catch (err) {
         console.error('Error fetching results:', err);
-        this.error = 'Failed to load results. Please try again.';
+        this.error = 'Failed to load results. Please try again: ' + err.message;
         this.loading = false;
       }
     },
     
-    getCellValue(paper, column) {
-      switch (column) {
-        case 'authors':
-          return paper.authors || 'Unknown';
-        case 'year':
-          return paper.year || 'N/A';
-        case 'journal':
-          return paper.journal || 'N/A';
-        // Add other column handling here
-        default:
-          return paper[column] || 'N/A';
+    async loadCodingSheet() {
+      try {
+        const response = await fetch(API_ROUTES.CODING.GET_BY_PROJECT_ID(this.projectId));
+        
+        if (response.ok) {
+          this.codingSheet = await response.json();
+          console.log('Loaded coding sheet:', this.codingSheet);
+          
+          // Update columns based on coding sheet
+          this.updateColumns();
+        }
+      } catch (err) {
+        console.error('Error loading coding sheet:', err);
       }
+    },
+    
+    updateColumns() {
+      if (!this.codingSheet) return;
+      
+      // Start with default columns
+      const defaultColumns = [
+        { name: 'title', label: 'Title' },
+        { name: 'authors', label: 'Authors' }
+      ];
+      
+      // Add columns based on coding sheet fields
+      const codingColumns = [];
+      
+      this.codingSheet.sections.forEach(section => {
+        section.fields.forEach(field => {
+          codingColumns.push({
+            name: field.name,
+            label: field.label,
+            type: field.type,
+            section: section.name
+          });
+        });
+      });
+      
+      this.columns = [...defaultColumns, ...codingColumns];
+    },
+    
+    async loadCodingData() {
+      // Initialize coded papers array
+      this.codedPapers = [];
+      
+      // For each paper, try to get its coding data
+      const codingPromises = this.papers.map(async (paper) => {
+        try {
+          const response = await fetch(API_ROUTES.CODING.GET_FOR_PAPER(paper.id));
+          
+          if (response.ok) {
+            const codingData = await response.json();
+            
+            // Combine paper metadata with coding data
+            return {
+              ...paper,
+              coding: codingData.data || {}
+            };
+          }
+          
+          // If no coding data, just return paper as is
+          return paper;
+        } catch (err) {
+          console.warn(`Error loading coding for paper ${paper.id}:`, err);
+          return paper;
+        }
+      });
+      
+      // Wait for all coding data to be fetched
+      this.codedPapers = await Promise.all(codingPromises);
+    },
+    
+    calculateTotalDataPoints() {
+      let total = 0;
+      
+      this.codedPapers.forEach(paper => {
+        if (paper.coding) {
+          // Count each field that has a value
+          total += Object.values(paper.coding).filter(value => {
+            return value !== null && value !== undefined && value !== '';
+          }).length;
+        }
+      });
+      
+      this.totalDataPoints = total;
+    },
+    
+    getCellValue(paper, column) {
+      if (column === 'title') {
+        return paper.title || 'Unknown';
+      }
+      
+      if (column === 'authors') {
+        if (paper.authors && Array.isArray(paper.authors)) {
+          if (paper.authors.length <= 3) {
+            return paper.authors.map(a => a.name || a).join(', ');
+          } else {
+            return `${paper.authors[0].name || paper.authors[0]}, et al.`;
+          }
+        }
+        return paper.authors || 'Unknown';
+      }
+      
+      if (column === 'journal') {
+        return paper.journal || 'N/A';
+      }
+      
+      if (column === 'year') {
+        if (paper.publication_date) {
+          return new Date(paper.publication_date).getFullYear();
+        }
+        return paper.year || 'N/A';
+      }
+      
+      // Check if it's a coding data field
+      if (paper.coding && paper.coding.hasOwnProperty(column)) {
+        return paper.coding[column] || 'N/A';
+      }
+      
+      // Default fallback
+      return paper[column] || 'N/A';
     },
     
     editPaper(paper) {
       // Navigate to coding view for this paper
-      console.log('Edit paper:', paper);
+      this.$emit('select-paper', paper, this.projectId);
     },
     
     prevPage() {

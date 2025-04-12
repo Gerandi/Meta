@@ -214,12 +214,19 @@
 </template>
 
 <script>
+import { API_ROUTES } from '../config.js';
+
 export default {
   name: 'PdfViewer',
   props: {
     paper: {
       type: Object,
       required: true
+    },
+    projectId: {
+      type: Number,
+      required: false,
+      default: null
     }
   },
   data() {
@@ -228,7 +235,10 @@ export default {
       loading: false,
       error: null,
       saving: false,
-      codingData: {
+      codingSheet: null,
+      codingData: {},
+      savedCoding: null,
+      defaultCodingData: {
         authors: '',
         publicationYear: '',
         journal: '',
@@ -246,10 +256,94 @@ export default {
     }
   },
   mounted() {
-    // Pre-fill form with paper metadata
-    this.prefillForm();
+    // Load the coding sheet for this project (if project ID is provided)
+    this.loadCodingSheet();
+    // Check if this paper already has coding data saved
+    this.loadExistingCoding();
   },
   methods: {
+    async loadCodingSheet() {
+      if (!this.projectId) return;
+      
+      try {
+        const response = await fetch(API_ROUTES.CODING.GET_BY_PROJECT_ID(this.projectId));
+        
+        if (response.ok) {
+          this.codingSheet = await response.json();
+          console.log('Loaded coding sheet:', this.codingSheet);
+          
+          // Initialize coding data object with fields from the coding sheet
+          this.initializeCodingData();
+        } else {
+          console.warn('No coding sheet found for this project. Using default form.');
+          // Use default form
+          this.codingData = { ...this.defaultCodingData };
+          this.prefillForm();
+        }
+      } catch (err) {
+        console.error('Error loading coding sheet:', err);
+        // Use default form on error
+        this.codingData = { ...this.defaultCodingData };
+        this.prefillForm();
+      }
+    },
+    
+    async loadExistingCoding() {
+      if (!this.paper.id) return;
+      
+      try {
+        const response = await fetch(API_ROUTES.CODING.GET_FOR_PAPER(this.paper.id));
+        
+        if (response.ok) {
+          this.savedCoding = await response.json();
+          console.log('Loaded existing coding:', this.savedCoding);
+          
+          // Merge existing coding data with our coding data object
+          if (this.savedCoding.data) {
+            this.codingData = { ...this.codingData, ...this.savedCoding.data };
+          }
+        } else {
+          console.log('No existing coding found for this paper.');
+        }
+      } catch (err) {
+        console.error('Error loading existing coding:', err);
+      }
+    },
+    
+    initializeCodingData() {
+      // Initialize coding data with empty values
+      if (!this.codingSheet) {
+        this.codingData = { ...this.defaultCodingData };
+        return;
+      }
+      
+      // Initialize from coding sheet sections and fields
+      const newCodingData = {};
+      
+      this.codingSheet.sections.forEach(section => {
+        section.fields.forEach(field => {
+          // Initialize with empty value based on field type
+          switch (field.type) {
+            case 'number':
+              newCodingData[field.name] = null;
+              break;
+            case 'boolean':
+              newCodingData[field.name] = false;
+              break;
+            case 'select':
+              // Get first option as default
+              const options = (field.options || '').split('\n');
+              newCodingData[field.name] = options.length > 0 ? options[0] : '';
+              break;
+            default:
+              newCodingData[field.name] = '';
+          }
+        });
+      });
+      
+      this.codingData = newCodingData;
+      this.prefillForm();
+    },
     formatAuthors(authors) {
       if (!authors || authors.length === 0) return 'Unknown Authors';
       
@@ -307,20 +401,44 @@ export default {
       this.saving = true;
       
       try {
-        // Add paper ID to coding data
-        const codingDataToSave = {
-          ...this.codingData,
-          paperId: this.paper.id
+        // Prepare the data to save
+        const payload = {
+          paperId: this.paper.id,
+          projectId: this.projectId,
+          data: this.codingData
         };
         
-        // For MVP, just log the data that would be saved
-        console.log('Saving coding data:', codingDataToSave);
+        // If we already have saved coding, update it
+        let url = API_ROUTES.CODING.SAVE_PAPER_CODING;
+        let method = 'POST';
+        
+        if (this.savedCoding && this.savedCoding.id) {
+          url = `${API_ROUTES.CODING.GET_BY_ID(this.savedCoding.id)}`;
+          method = 'PUT';
+          payload.id = this.savedCoding.id;
+        }
+        
+        const response = await fetch(url, {
+          method: method,
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to save coding data');
+        }
+        
+        const savedData = await response.json();
+        this.savedCoding = savedData;
         
         // Show success message
-        alert('Coding data saved successfully! (This is a mock action for the MVP)');
+        alert('Coding data saved successfully!');
       } catch (err) {
         console.error('Error saving coding data:', err);
-        alert('Failed to save coding data. Please try again.');
+        alert('Failed to save coding data: ' + err.message);
       } finally {
         this.saving = false;
       }
