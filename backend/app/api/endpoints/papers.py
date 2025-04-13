@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, status, UploadFile, File, Form, BackgroundTasks
+from fastapi.responses import FileResponse
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 import httpx
@@ -22,6 +23,57 @@ from app.services.project import add_paper_to_project
 from app.db.session import get_db
 
 router = APIRouter()
+
+
+@router.get("/counts", response_model=Dict[str, int])
+async def get_paper_counts(
+    db: Session = Depends(get_db),
+):
+    """
+    Get counts of papers by various criteria.
+    """
+    # Count total papers
+    total_count = db.query(Paper).count()
+    
+    # Count papers with PDFs
+    with_pdf_count = db.query(Paper).filter(Paper.file_path.isnot(None)).count()
+    
+    # Count papers with DOIs
+    with_doi_count = db.query(Paper).filter(Paper.doi.isnot(None)).count()
+    
+    # Count open access papers
+    open_access_count = db.query(Paper).filter(Paper.is_open_access == True).count()
+    
+    return {
+        "total": total_count,
+        "with_pdf": with_pdf_count,
+        "with_doi": with_doi_count,
+        "open_access": open_access_count
+    }
+
+
+@router.get("/cleanup", response_model=List[Paper])
+async def list_papers_for_cleanup(
+    skip: int = Query(0, description="Number of papers to skip"),
+    limit: int = Query(100, description="Maximum number of papers to return"),
+    sort_by: str = Query("title", description="Field to sort by"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get a list of papers with pagination and sorting for cleanup purposes.
+    """
+    query = db.query(Paper)
+    
+    # Add sorting
+    if sort_by == "title":
+        query = query.order_by(Paper.title)
+    elif sort_by == "date":
+        query = query.order_by(Paper.publication_date.desc())
+    elif sort_by == "journal":
+        query = query.order_by(Paper.journal)
+    
+    papers = query.offset(skip).limit(limit).all()
+    return papers
 
 
 @router.post("/", response_model=Paper, status_code=status.HTTP_201_CREATED)
@@ -72,6 +124,37 @@ async def delete_paper_by_id(
     """
     delete_paper(db, paper_id)
     return None
+
+
+@router.get("/{paper_id}/content", response_class=FileResponse)
+@router.head("/{paper_id}/content")
+async def get_paper_content(
+    paper_id: int = Path(..., description="The ID of the paper"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the content (PDF) of a paper stored locally.
+    """
+    db_paper = get_paper_by_id(db, paper_id)
+    if not db_paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    if not db_paper.file_path:
+        raise HTTPException(status_code=404, detail="No local file associated with this paper")
+
+    file_path = db_paper.file_path
+    if not os.path.exists(file_path):
+        logger.error(f"File not found at path: {file_path} for paper ID {paper_id}")
+        raise HTTPException(status_code=404, detail="File not found on server")
+
+    # Return the file
+    # Extract filename for download suggestion
+    filename = os.path.basename(file_path)
+    # Remove potential UUID prefix for cleaner download name
+    if "_" in filename and len(filename.split("_")[0]) == 36:  # Basic check for UUID prefix
+        filename = "_".join(filename.split("_")[1:])
+
+    return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
 
 
 @router.get("/", response_model=List[Paper])

@@ -932,7 +932,7 @@ export default {
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ papers: formattedPapers })
+          body: JSON.stringify(formattedPapers)
         });
         
         if (!response.ok) {

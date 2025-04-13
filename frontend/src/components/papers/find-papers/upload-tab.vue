@@ -172,7 +172,7 @@ export default {
         if (item.status === 'queued') {
           try {
             // Update status to uploading
-            this.$set(this.uploadQueue, i, { ...item, status: 'uploading' });
+            this.uploadQueue[i] = { ...item, status: 'uploading' };
             
             // Create form data
             const formData = new FormData();
@@ -193,7 +193,7 @@ export default {
               xhr.upload.addEventListener('progress', (event) => {
                 if (event.lengthComputable) {
                   const percentComplete = Math.round((event.loaded / event.total) * 100);
-                  this.$set(this.uploadQueue, i, { ...this.uploadQueue[i], progress: percentComplete });
+                  this.uploadQueue[i] = { ...this.uploadQueue[i], progress: percentComplete };
                 }
               });
               
@@ -202,12 +202,12 @@ export default {
                   try {
                     const response = JSON.parse(xhr.responseText);
                     // Store paper data in item
-                    this.$set(this.uploadQueue, i, {
+                    this.uploadQueue[i] = {
                       ...this.uploadQueue[i],
                       status: 'complete',
                       progress: 100,
                       paper: response
-                    });
+                    };
                     resolve(response);
                   } catch (e) {
                     reject(new Error('Invalid response format'));
@@ -230,11 +230,11 @@ export default {
             
           } catch (error) {
             console.error(`Error uploading ${item.name}:`, error);
-            this.$set(this.uploadQueue, i, {
+            this.uploadQueue[i] = {
               ...this.uploadQueue[i],
               status: 'error',
               error: error.message
-            });
+            };
           }
         }
       }

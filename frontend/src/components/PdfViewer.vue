@@ -137,38 +137,68 @@ export default {
       this.error = null;
       
       try {
-        // First check if the paper already has a direct PDF URL
-        if (this.paper.open_access_url) {
-          this.pdfUrl = this.paper.open_access_url;
-          this.loading = false;
-          return;
-        }
-        
-        // If not, try to get the PDF URL from the API
-        if (this.paper.doi) {
-          const response = await fetch(`${API_ROUTES.PAPERS.GET_PDF}/${encodeURIComponent(this.paper.doi)}`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.pdf_url) {
-              this.pdfUrl = data.pdf_url;
-              this.loading = false;
-              return;
+        this.loading = true;
+        this.error = null;
+        this.pdfUrl = null; // Reset pdfUrl
+
+        try {
+          // 1. Check for direct open_access_url
+          if (this.paper.open_access_url) {
+            console.log("Using open_access_url:", this.paper.open_access_url);
+            this.pdfUrl = this.paper.open_access_url;
+            this.loading = false;
+            return;
+          }
+
+          // 2. Try API lookup via DOI
+          if (this.paper.doi) {
+            console.log("Attempting DOI lookup for PDF:", this.paper.doi);
+            // Clean DOI - remove any trailing text like 'Financial' that might have been appended
+            const doi = this.paper.doi.split(/[^0-9./\-a-zA-Z]/)[0].trim();
+            const response = await fetch(`${API_ROUTES.PAPERS.GET_PDF}/${encodeURIComponent(doi)}`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.pdf_url) {
+                console.log("Found PDF via DOI lookup:", data.pdf_url);
+                this.pdfUrl = data.pdf_url;
+                this.loading = false;
+                return;
+              }
+            } else {
+              console.warn(`DOI lookup failed: ${response.status}`);
             }
           }
-        }
-        
-        // If we still don't have a PDF URL, check if the paper has a local file path
-        if (this.paper.file_path) {
-          // In a real implementation, we would have an API endpoint to serve local files
-          // For now, we'll simulate this with a placeholder
-          this.pdfUrl = `/api/papers/${this.paper.id}/pdf-content`;
+
+          // 3. Check for local file_path and use the new endpoint
+          if (this.paper.id) {
+            const localPdfUrl = `${API_ROUTES.PAPERS.GET_CONTENT(this.paper.id)}`;
+            console.log("Trying local file path via endpoint:", localPdfUrl);
+            
+            // Use fetch with HEAD request to check existence without downloading
+            try {
+              const headResponse = await fetch(localPdfUrl, { method: 'HEAD' });
+              if (headResponse.ok) {
+                console.log("Local PDF file found");
+                this.pdfUrl = localPdfUrl;
+                this.loading = false;
+                return;
+              } else {
+                console.warn(`Local file endpoint check failed: ${headResponse.status}`);
+              }
+            } catch (headError) {
+              console.error("Error checking local file endpoint:", headError);
+            }
+          }
+
+          // 4. If none of the above worked
+          console.log("No PDF source found for this paper.");
+          this.pdfUrl = null;
           this.loading = false;
-          return;
+        } catch (err) {
+          console.error('Error loading PDF:', err);
+          this.error = 'Failed to load PDF: ' + err.message;
+          this.loading = false;
         }
-        
-        // If we reach here, there's no PDF available
-        this.pdfUrl = null;
-        this.loading = false;
       } catch (err) {
         console.error('Error loading PDF:', err);
         this.error = 'Failed to load PDF: ' + err.message;

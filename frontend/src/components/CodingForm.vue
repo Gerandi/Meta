@@ -281,7 +281,7 @@ export default {
       if (!this.projectId) return;
       
       try {
-        const response = await fetch(API_ROUTES.CODING.GET_BY_PROJECT_ID(this.projectId));
+        const response = await fetch(API_ROUTES.CODING.SHEETS.GET_BY_PROJECT_ID(this.projectId));
         
         if (response.ok) {
           this.codingSheet = await response.json();
@@ -307,7 +307,7 @@ export default {
       if (!this.paper.id) return;
       
       try {
-        const response = await fetch(API_ROUTES.CODING.GET_FOR_PAPER(this.paper.id));
+        const response = await fetch(API_ROUTES.CODING.DATA.GET_BY_PAPER_ID(this.paper.id));
         
         if (response.ok) {
           this.savedCoding = await response.json();
@@ -443,11 +443,11 @@ export default {
         };
         
         // If we already have saved coding, update it
-        let url = API_ROUTES.CODING.SAVE_PAPER_CODING;
+        let url = API_ROUTES.CODING.DATA.CREATE;
         let method = 'POST';
         
         if (this.savedCoding && this.savedCoding.id) {
-          url = `${API_ROUTES.CODING.UPDATE(this.savedCoding.id)}`;
+          url = `${API_ROUTES.CODING.DATA.UPDATE(this.savedCoding.id)}`;
           method = 'PUT';
           payload.id = this.savedCoding.id;
         }

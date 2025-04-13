@@ -15,9 +15,11 @@ class CodingSheet(Base):
     name = Column(String, index=True, nullable=False)
     description = Column(Text, nullable=True)
     sections = Column(JSON, nullable=False)  # List of CodingSection objects
+    project_id = Column(Integer, ForeignKey("project.id"), nullable=False, index=True)
     
     # Relationships
     coding_data = relationship("CodingData", back_populates="sheet", cascade="all, delete-orphan")
+    project = relationship("Project")
 
 
 class CodingData(Base):

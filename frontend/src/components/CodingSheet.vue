@@ -1,4 +1,18 @@
-<template>
+    getFieldOptionsCount(options) {
+      if (!options) return 0;
+      
+      // If options is a string, count the lines
+      if (typeof options === 'string') {
+        return options.split('\n').filter(option => option.trim()).length;
+      }
+      
+      // If options is an array, return its length
+      if (Array.isArray(options)) {
+        return options.length;
+      }
+      
+      return 0;
+    },<template>
   <div class="p-6 bg-gray-100 min-h-screen">
     <!-- Header with back button, title, and save/duplicate buttons -->
     <div class="flex items-center mb-6">
@@ -65,7 +79,7 @@
             <div class="text-sm text-gray-500 flex items-center">
               <span>{{ getFieldTypeName(field.type) }}</span>
               <span v-if="field.options" class="ml-2 text-gray-400">
-                ({{ field.options.split('\n').length }} options)
+                ({{ getFieldOptionsCount(field.options) }} options)
               </span>
             </div>
           </div>
@@ -521,8 +535,18 @@ export default {
         const codingSheet = {
           name: `${this.projectName} Coding Sheet`,
           description: `Coding sheet for project: ${this.projectName}`,
-          projectId: this.projectId,
-          sections: this.sectionsArray
+          project_id: this.projectId,
+          sections: this.sectionsArray.map(section => ({
+            ...section,
+            fields: section.fields.map(field => {
+              // Convert string options to arrays if present
+              const processedField = { ...field };
+              if (field.options && typeof field.options === 'string') {
+                processedField.options = field.options.split('\n').filter(opt => opt.trim());
+              }
+              return processedField;
+            })
+          }))
         };
         
         let response;

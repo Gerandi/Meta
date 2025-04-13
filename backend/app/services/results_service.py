@@ -21,11 +21,8 @@ def get_results_table_service(db: Session, project_id: int) -> ResultsTable:
     # Step 1: Get the coding sheet for this project
     coding_sheet = get_coding_sheet_by_project_service(db, project_id)
     if not coding_sheet:
-        # If no specific coding sheet is found, use any available sheet
-        coding_sheet = db.query(CodingSheet).first()
-        if not coding_sheet:
-            # If no coding sheets exist at all, return an empty results table
-            return ResultsTable(columns=[], rows=[], total_rows=0, page=1, page_size=50)
+        # If no coding sheet exists for this project, return an empty results table
+        return ResultsTable(columns=[], rows=[], total_rows=0, page=1, page_size=50)
     
     # Step 2: Get all papers in this project
     papers = db.query(Paper).filter(Paper.projects.any(id=project_id)).all()

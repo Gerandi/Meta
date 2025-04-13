@@ -178,7 +178,7 @@ export const paperService = {
 
 export const codingService = {
   async createCodingSheet(codingSheetData) {
-    const response = await fetch(API_ROUTES.CODING.CREATE, {
+    const response = await fetch(API_ROUTES.CODING.SHEETS.CREATE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(codingSheetData),
@@ -187,22 +187,22 @@ export const codingService = {
   },
   
   async listCodingSheets() {
-    const response = await fetch(API_ROUTES.CODING.LIST);
+    const response = await fetch(API_ROUTES.CODING.SHEETS.LIST);
     return handleResponse(response);
   },
   
   async getCodingSheet(sheetId) {
-    const response = await fetch(API_ROUTES.CODING.GET_BY_ID(sheetId));
+    const response = await fetch(API_ROUTES.CODING.SHEETS.GET_BY_ID(sheetId));
     return handleResponse(response);
   },
   
   async getCodingSheetByProject(projectId) {
-    const response = await fetch(API_ROUTES.CODING.GET_BY_PROJECT_ID(projectId));
+    const response = await fetch(API_ROUTES.CODING.SHEETS.GET_BY_PROJECT_ID(projectId));
     return handleResponse(response);
   },
   
   async updateCodingSheet(sheetId, codingSheetData) {
-    const response = await fetch(API_ROUTES.CODING.UPDATE(sheetId), {
+    const response = await fetch(API_ROUTES.CODING.SHEETS.UPDATE(sheetId), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(codingSheetData),
@@ -211,14 +211,14 @@ export const codingService = {
   },
   
   async deleteCodingSheet(sheetId) {
-    const response = await fetch(API_ROUTES.CODING.DELETE(sheetId), {
+    const response = await fetch(API_ROUTES.CODING.SHEETS.DELETE(sheetId), {
       method: 'DELETE',
     });
     return handleResponse(response);
   },
   
   async createCodingData(codingData) {
-    const response = await fetch(API_ROUTES.CODING.SAVE_PAPER_CODING, {
+    const response = await fetch(API_ROUTES.CODING.DATA.CREATE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(codingData),
@@ -227,7 +227,7 @@ export const codingService = {
   },
   
   async getCodingData(paperId, sheetId = null) {
-    let url = API_ROUTES.CODING.GET_FOR_PAPER(paperId);
+    let url = API_ROUTES.CODING.DATA.GET_BY_PAPER_ID(paperId);
     if (sheetId) {
       url += `?sheet_id=${sheetId}`;
     }
@@ -236,7 +236,7 @@ export const codingService = {
   },
   
   async updateCodingData(codingDataId, codingData) {
-    const response = await fetch(API_ROUTES.CODING.UPDATE(codingDataId), {
+    const response = await fetch(API_ROUTES.CODING.DATA.UPDATE(codingDataId), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(codingData),
@@ -245,7 +245,7 @@ export const codingService = {
   },
   
   async deleteCodingData(codingDataId) {
-    const response = await fetch(API_ROUTES.CODING.DELETE(codingDataId), {
+    const response = await fetch(API_ROUTES.CODING.DATA.DELETE(codingDataId), {
       method: 'DELETE',
     });
     return handleResponse(response);
