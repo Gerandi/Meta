@@ -69,7 +69,7 @@
           </button>
           <button 
             class="flex items-center px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"
-            @click="showProjectModal = true"
+            @click="addSelectedImportedToProject"
             :disabled="selectedImportedPapers.length === 0"
           >
             <PlusCircle class="mr-1" size="16" /> Add to Project
@@ -84,6 +84,18 @@
         </div>
         
         <template v-else>
+          <div class="p-3 border-b flex items-center">
+            <input 
+              type="checkbox" 
+              :checked="allImportedSelected"
+              @change="toggleSelectAllImported"
+              class="h-4 w-4 text-indigo-600 mr-2 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <span class="text-sm text-gray-600">Select All</span>
+            <span class="ml-2 text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+              {{ selectedImportedPapers.length }} selected
+            </span>
+          </div>
           <ImportedPaperItem 
             v-for="paper in importedPapers" 
             :key="paper.id" 
@@ -258,7 +270,8 @@ export default {
       },
       
       // Imported Papers
-      importedPapers: []
+      importedPapers: [],
+      allImportedSelected: false
     };
   },
   mounted() {
@@ -301,6 +314,27 @@ export default {
       } else {
         this.selectedImportedPapers.push(paperId);
       }
+      
+      // Update allImportedSelected status
+      this.updateAllImportedSelected();
+    },
+    
+    toggleSelectAllImported() {
+      if (this.allImportedSelected) {
+        // Deselect all
+        this.selectedImportedPapers = [];
+        this.allImportedSelected = false;
+      } else {
+        // Select all imported papers
+        this.selectedImportedPapers = this.importedPapers.map(paper => paper.id);
+        this.allImportedSelected = true;
+      }
+    },
+    
+    updateAllImportedSelected() {
+      this.allImportedSelected = 
+        this.importedPapers.length > 0 && 
+        this.importedPapers.every(paper => this.selectedImportedPapers.includes(paper.id));
     },
     
     toggleSelectAll() {
@@ -799,11 +833,32 @@ export default {
         this.papersToAddToProject = [];
         
         // Refresh the imported papers list to show updated associations
+        // After papers are added to a project, their status changes from IMPORTED to PROCESSING
+        // so they should no longer appear in the imported papers list
         await this.fetchImportedPapers();
+        
+        // Clear selection
+        this.selectedImportedPapers = [];
       } catch (error) {
         console.error('Error adding papers to project:', error);
         alert('There was a problem adding papers to the project: ' + error.message);
       }
+    },
+    
+    // Add selected imported papers to project
+    addSelectedImportedToProject() {
+      if (this.selectedImportedPapers.length === 0) {
+        alert('Please select papers to add to a project');
+        return;
+      }
+      
+      // Store the selected paper IDs directly as papers to add to project
+      this.papersToAddToProject = this.selectedImportedPapers.map(id => {
+        return { id: id };
+      });
+      
+      // Show project selection modal
+      this.showProjectModal = true;
     },
     
     addToProject(paper) {
@@ -929,10 +984,21 @@ export default {
         console.log('Fetching imported papers');
         this.importedPapers = await paperService.listImportedPapers();
         console.log(`Fetched ${this.importedPapers.length} imported papers`);
+        
+        // If papers were removed from the imported list (e.g., added to a project),
+        // clean up the selected array to avoid phantom selections
+        this.selectedImportedPapers = this.selectedImportedPapers.filter(id => 
+          this.importedPapers.some(paper => paper.id === id)
+        );
+        
+        // Update allImportedSelected status
+        this.updateAllImportedSelected();
       } catch (error) {
         console.error('Error fetching imported papers:', error);
         // Don't use mock data - show empty state
         this.importedPapers = [];
+        this.selectedImportedPapers = [];
+        this.allImportedSelected = false;
       }
     }
   }

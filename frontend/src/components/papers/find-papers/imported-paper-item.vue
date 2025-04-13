@@ -1,16 +1,24 @@
 <template>
-  <div class="p-4 hover:bg-gray-50 flex justify-between">
+  <div class="p-4 hover:bg-gray-50 flex justify-between" :class="{ 'bg-indigo-50': selected }">
+    <div class="flex-shrink-0 mr-3">
+      <input 
+        type="checkbox" 
+        :checked="selected" 
+        @change="$emit('toggle-selection')"
+        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+      />
+    </div>
     <div>
       <div class="font-medium text-indigo-600 mb-1">{{ paper.title || 'Unknown Title' }}</div>
       <div class="text-sm text-gray-700 mb-1">{{ formatAuthors(paper.authors) }}</div>
       <div class="text-sm text-gray-500">{{ paper.journal || 'Unknown Journal' }} • {{ paper.year || 'Unknown Year' }}</div>
     </div>
-    <div class="flex items-center">
+    <div class="flex items-center space-x-3">
       <span 
         class="text-xs px-2 py-1 rounded-full"
-        :class="paper.status === 'imported' || paper.status === 'complete' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'"
+        :class="getStatusClass(paper.status)"
       >
-        {{ paper.status === 'imported' || paper.status === 'complete' ? 'Imported' : 'Processing...' }}
+        {{ getStatusText(paper.status) }}
       </span>
       <div class="ml-4 flex">
         <button 
@@ -24,8 +32,19 @@
           @click="$emit('remove')"
         >
           <X size="18" />
-        </button>
-      </div>
+          </button>
+            <button 
+        class="p-1 text-gray-400 hover:text-indigo-600"
+        @click="$emit('toggle-selection')"
+      >
+        <input 
+          type="checkbox" 
+          :checked="selected" 
+          @click.stop 
+          class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+        />
+      </button>
+    </div>
     </div>
   </div>
 </template>

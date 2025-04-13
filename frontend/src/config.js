@@ -34,6 +34,8 @@ export const API_ROUTES = {
         FIND_DUPLICATES: `${API_BASE_URL}/papers/find-duplicates`,
         UPDATE_METADATA: (id) => `${API_BASE_URL}/papers/${id}/update-metadata`,
         RETRIEVE_PDF: (id) => `${API_BASE_URL}/papers/${id}/retrieve-pdf`,
+        MARK_READY: (id) => `${API_BASE_URL}/papers/${id}/mark-ready`,
+        PROJECT_PROCESSING: (projectId) => `${API_BASE_URL}/projects/${projectId}/processing`,
         COUNTS: `${API_BASE_URL}/papers/counts`,
     },
     CODING: {

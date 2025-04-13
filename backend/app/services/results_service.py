@@ -1,9 +1,13 @@
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
 from fastapi import HTTPException
+import logging
 
-from app.models.paper import Paper
+logger = logging.getLogger(__name__)
+
+from app.models.paper import Paper, PaperStatus
 from app.models.coding import CodingSheet, CodingData
+from app.models.project import paper_project
 from app.schemas.results import ResultsTable, ResultColumn, ResultRow
 from app.services.coding_service import get_coding_sheet_by_project_service
 
@@ -24,8 +28,12 @@ def get_results_table_service(db: Session, project_id: int) -> ResultsTable:
         # If no coding sheet exists for this project, return an empty results table
         return ResultsTable(columns=[], rows=[], total_rows=0, page=1, page_size=50)
     
-    # Step 2: Get all papers in this project
-    papers = db.query(Paper).filter(Paper.projects.any(id=project_id)).all()
+    # Step 2: Get only CODED papers in this project
+    papers = db.query(Paper)\
+        .join(paper_project)\
+        .filter(paper_project.c.project_id == project_id)\
+        .filter(Paper.status == PaperStatus.CODED)\
+        .all()
     
     # Step 3: Define columns
     columns = []
@@ -59,13 +67,16 @@ def get_results_table_service(db: Session, project_id: int) -> ResultsTable:
         values = {
             "title": paper.title,
             "authors": format_authors(paper.authors),
-            "publication_date": paper.publication_date,
+            "publication_date": paper.publication_date.strftime('%Y-%m-%d') if paper.publication_date else None,
             "journal": paper.journal
         }
         
         # Add coded data if available
         if coding_data and coding_data.data:
             values.update(coding_data.data)
+        else:
+            # Log a warning if a paper is CODED but has no coding data
+            logger.warning(f"Paper ID {paper.id} has status CODED but no coding data found for sheet ID {coding_sheet.id}")
         
         # Add row
         rows.append(ResultRow(

@@ -1,3 +1,4 @@
+
 <template>
   <div class="p-6 bg-gray-100 min-h-screen">
     <div class="flex justify-between items-center mb-6">
@@ -391,8 +392,8 @@
                     <button class="text-indigo-600 hover:text-indigo-900 mr-3" @click="uploadPdf(paper)">
                       Upload
                     </button>
-                    <button class="text-indigo-600 hover:text-indigo-900" @click="addPdfUrl(paper)">
-                      Add URL
+                    <button class="text-indigo-600 hover:text-indigo-900" @click="markPaperReady(paper)">
+                      Mark Ready
                     </button>
                   </template>
                   <template v-else-if="paper.pdfStatus === 'available'">
@@ -754,6 +755,7 @@
 
 <script>
 import { API_ROUTES } from '../config.js';
+import { paperService } from '../services/api.js';
 
 export default {
   name: 'PaperProcessing',
@@ -784,6 +786,10 @@ export default {
     selectedPapers: {
       type: Array,
       default: () => []
+    },
+    activeProject: {
+      type: Object,
+      required: true
     }
   },
   data() {
@@ -866,6 +872,10 @@ export default {
       this.error = null;
       
       try {
+        if (!this.activeProject || !this.activeProject.id) {
+          throw new Error('No active project selected');
+        }
+
         // Build query parameters
         const params = new URLSearchParams();
         params.append('skip', ((this.currentPage - 1) * this.itemsPerPage).toString());
@@ -879,17 +889,8 @@ export default {
           params.append('search', this.searchQuery);
         }
         
-        // Apply filters based on active tab
-        if (this.activeTab === 'cleanup' && this.filterType !== 'all') {
-          params.append('filter_type', this.filterType);
-        }
-        
-        if (this.activeTab === 'retrieve' && this.pdfFilterType !== 'all') {
-          // For retrieve tab, use pdfStatus as filter
-          params.append('filter_type', this.pdfFilterType === 'missing' ? 'missing_pdf' : 'available_pdf');
-        }
-        
-        const response = await fetch(`${API_ROUTES.PROCESSING.CLEANUP}?${params.toString()}`);
+        // Use the new project-specific processing endpoint
+        const response = await fetch(API_ROUTES.PROCESSING.PROJECT_PROCESSING(this.activeProject.id) + '?' + params.toString());
         
         if (!response.ok) {
           const errorData = await response.json();
@@ -898,6 +899,12 @@ export default {
         
         const data = await response.json();
         this.papers = data;
+        this.totalPapers = data.length;
+        this.totalPages = Math.ceil(this.totalPapers / this.itemsPerPage);
+        
+        // Update counts for different PDF statuses
+        this.missingPdfCount = this.papers.filter(p => p.pdfStatus === 'missing').length;
+        this.availablePdfCount = this.papers.filter(p => p.pdfStatus === 'available').length;
         
       } catch (err) {
         this.error = err.message;
@@ -1063,13 +1070,14 @@ export default {
           const index = this.papers.findIndex(p => p.id === paper.id);
           if (index !== -1) {
             this.papers[index].pdfStatus = 'available';
+            this.papers[index].status = 'ready_to_code'; // Update status to ready_to_code
           }
           
           // Update counts
           this.missingPdfCount = Math.max(0, this.missingPdfCount - 1);
           this.availablePdfCount++;
           
-          alert('PDF retrieved successfully.');
+          alert('PDF retrieved successfully and paper marked as ready for coding.');
         } else {
           alert('No open access PDF found for this paper.');
         }
@@ -1080,6 +1088,34 @@ export default {
       } finally {
         // Remove from retrieving set
         this.retrievingPapers.delete(paper.id);
+      }
+    },
+
+    // Mark paper as ready for coding (when PDF isn't available but coding can proceed)
+    async markPaperReady(paper) {
+      try {
+        const response = await fetch(API_ROUTES.PROCESSING.MARK_READY(paper.id), {
+          method: 'PUT'
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to mark paper as ready');
+        }
+        
+        // Update paper in the list
+        const index = this.papers.findIndex(p => p.id === paper.id);
+        if (index !== -1) {
+          this.papers[index].status = 'ready_to_code';
+        }
+        
+        alert('Paper marked as ready for coding.');
+        // Refresh the papers list since status changed
+        await this.fetchPapers();
+        
+      } catch (err) {
+        console.error('Error marking paper as ready:', err);
+        alert(`Error marking paper as ready: ${err.message}`);
       }
     },
     

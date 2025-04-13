@@ -1,10 +1,14 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from sqlalchemy.exc import IntegrityError
+from datetime import datetime
 
 from app.models.coding import CodingSheet, CodingData
-from app.models.paper import Paper
+from app.models.paper import Paper, PaperStatus
 from app.schemas.coding import CodingSheetCreate, CodingDataCreate
+import logging
+
+logger = logging.getLogger(__name__)
 
 def create_coding_sheet_service(db: Session, coding_sheet: CodingSheetCreate) -> CodingSheet:
     """
@@ -111,6 +115,7 @@ def delete_coding_sheet_service(db: Session, sheet_id: int) -> bool:
 def create_coding_data_service(db: Session, coding_data: CodingDataCreate) -> CodingData:
     """
     Create a new coding data entry or update if it already exists.
+    Also updates the paper status to 'coded' when coding data is saved.
     
     Args:
         db: Database session
@@ -132,19 +137,31 @@ def create_coding_data_service(db: Session, coding_data: CodingDataCreate) -> Co
                 setattr(existing_data, key, value)
             db.commit()
             db.refresh(existing_data)
-            return existing_data
+            db_coding_data = existing_data
         else:
             # Create new data
             db_coding_data = CodingData(**coding_data.dict())
             db.add(db_coding_data)
             db.commit()
             db.refresh(db_coding_data)
-            return db_coding_data
+        
+        # Update the paper status to CODED
+        paper = db.query(Paper).filter(Paper.id == coding_data.paper_id).first()
+        if paper and paper.status != PaperStatus.CODED:
+            paper.status = PaperStatus.CODED
+            paper.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(paper)
+            logger.info(f"Updated paper {paper.id} status to CODED")
+        
+        return db_coding_data
     except IntegrityError as e:
         db.rollback()
+        logger.error(f"Integrity error saving coding data for paper {coding_data.paper_id}: {e}")
         raise ValueError(f"Error creating coding data: {str(e)}")
     except Exception as e:
         db.rollback()
+        logger.error(f"Error saving coding data for paper {coding_data.paper_id}: {e}")
         raise Exception(f"Error creating coding data: {str(e)}")
 
 def get_coding_data_service(db: Session, paper_id: int, sheet_id: Optional[int] = None) -> Optional[CodingData]:
@@ -168,7 +185,7 @@ def get_coding_data_service(db: Session, paper_id: int, sheet_id: Optional[int] 
 
 def update_coding_data_service(db: Session, coding_data_id: int, coding_data: Dict[str, Any]) -> Optional[CodingData]:
     """
-    Update coding data.
+    Update coding data and set paper status to CODED.
     
     Args:
         db: Database session
@@ -189,9 +206,20 @@ def update_coding_data_service(db: Session, coding_data_id: int, coding_data: Di
             
         db.commit()
         db.refresh(db_coding_data)
+        
+        # Update the paper status to CODED
+        paper = db.query(Paper).filter(Paper.id == db_coding_data.paper_id).first()
+        if paper and paper.status != PaperStatus.CODED:
+            paper.status = PaperStatus.CODED
+            paper.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(paper)
+            logger.info(f"Updated paper {paper.id} status to CODED")
+        
         return db_coding_data
     except Exception as e:
         db.rollback()
+        logger.error(f"Error updating coding data: {e}")
         raise Exception(f"Error updating coding data: {str(e)}")
 
 def delete_coding_data_service(db: Session, coding_data_id: int) -> bool:
