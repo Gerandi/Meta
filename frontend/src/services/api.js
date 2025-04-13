@@ -1,6 +1,44 @@
 // frontend/src/services/api.js
 import { API_ROUTES } from '../config';
 
+// Processing service for papers that need processing
+export const processingService = {
+  async getPapersForProcessing(projectId, skip = 0, limit = 100, filters = {}) {
+    const params = new URLSearchParams({ skip, limit });
+    
+    // Add any additional filters
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== '') {
+        params.append(key, value);
+      }
+    });
+    
+    const url = `${API_ROUTES.PROCESSING.PROJECT_PROCESSING(projectId)}?${params.toString()}`;
+    const response = await fetch(url);
+    return handleResponse(response);
+  },
+
+  async retrievePdfForPaper(paperId) {
+    const response = await fetch(API_ROUTES.PROCESSING.RETRIEVE_PDF(paperId), {
+      method: 'POST',
+    });
+    return handleResponse(response);
+  },
+
+  async markPaperReady(paperId) {
+    const response = await fetch(API_ROUTES.PROCESSING.MARK_READY(paperId), {
+      method: 'PUT',
+    });
+    return handleResponse(response);
+  },
+
+  // Find duplicates within a project
+  async findProjectDuplicates(projectId) {
+    const response = await fetch(`${API_ROUTES.PROCESSING.FIND_DUPLICATES}?project_id=${projectId}`);
+    return handleResponse(response);
+  }
+};
+
 async function handleResponse(response) {
   if (!response.ok) {
     let errorDetail = `HTTP error! status: ${response.status}`;

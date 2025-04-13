@@ -60,60 +60,17 @@
             />
     </div>
 
-    <div class="bg-white rounded-lg shadow">
-      <div class="p-4 border-b flex justify-between items-center">
-        <div class="font-medium">Imported Papers ({{ importedPapers.length || 0 }})</div>
-        <div class="flex items-center">
-          <button class="flex items-center px-3 py-2 text-sm border rounded-lg mr-2 hover:bg-gray-50">
-            <Filter class="mr-1" size="16" /> Filter
-          </button>
-          <button 
-            class="flex items-center px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"
-            @click="addSelectedImportedToProject"
-            :disabled="selectedImportedPapers.length === 0"
-          >
-            <PlusCircle class="mr-1" size="16" /> Add to Project
-          </button>
-        </div>
-      </div>
+    <ImportedPapersSection
+      ref="importedPapersSection"
+      :isLoading="isLoading"
+      :activeProject="activeProject"
+      @view-paper="viewPaper"
+      @download-pdf="downloadPdf"
+      @paper-added-to-project="handlePaperAddedToProject"
+      @refresh-imported-papers="fetchImportedPapers"
+    />
 
-      <div class="divide-y">
-        <div v-if="isLoading" class="text-center py-8">
-          <div class="spinner mb-4"></div>
-          <p class="text-gray-500">Loading papers...</p>
-        </div>
-        
-        <template v-else>
-          <div class="p-3 border-b flex items-center">
-            <input 
-              type="checkbox" 
-              :checked="allImportedSelected"
-              @change="toggleSelectAllImported"
-              class="h-4 w-4 text-indigo-600 mr-2 focus:ring-indigo-500 border-gray-300 rounded"
-            />
-            <span class="text-sm text-gray-600">Select All</span>
-            <span class="ml-2 text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
-              {{ selectedImportedPapers.length }} selected
-            </span>
-          </div>
-          <ImportedPaperItem 
-            v-for="paper in importedPapers" 
-            :key="paper.id" 
-            :paper="paper"
-            :selected="isImportedSelected(paper.id)"
-            @toggle-selection="toggleImportedSelection(paper.id)"
-            @view="viewPaper(paper)"
-            @download="downloadPdf(paper)"
-            @remove="removePaper(paper.id)"
-          />
-          <div v-if="importedPapers.length === 0" class="p-10 text-center text-gray-500 border-dashed border-gray-300">
-            <FileText class="text-gray-300 mx-auto mb-3" size="40" />
-            <p class="mb-2">No papers imported yet</p>
-            <p class="text-sm">Use the tabs above to search databases or upload PDFs</p>
-          </div>
-        </template>
-      </div>
-    </div>
+
 
     <!-- Project Select Modal -->
     <div v-if="showProjectModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
@@ -198,7 +155,7 @@
 <script>
 import SearchTab from './papers/find-papers/search-tab.vue';
 import UploadTab from './papers/find-papers/upload-tab.vue';
-import ImportedPaperItem from './papers/find-papers/imported-paper-item.vue';
+import ImportedPapersSection from './papers/ImportedPapersSection.vue';
 import { API_ROUTES, APP_CONFIG } from '../config.js';
 import { paperService, projectService } from '../services/api.js';
 import { 
@@ -216,7 +173,7 @@ export default {
   components: {
     SearchTab,
     UploadTab,
-    ImportedPaperItem,
+    ImportedPapersSection,
     Search,
     Upload,
     Filter,
@@ -239,7 +196,7 @@ export default {
         openAccessOnly: false
       },
       selectedPapers: [],
-      selectedImportedPapers: [],
+      // selectedImportedPapers moved to ImportedPapersSection
       allSelected: false,
       showMoreFilters: false,
       isLoading: false,
@@ -269,14 +226,11 @@ export default {
         description: ''
       },
       
-      // Imported Papers
-      importedPapers: [],
-      allImportedSelected: false
+      // Note: importedPapers state has been moved to ImportedPapersSection component
     };
   },
   mounted() {
     this.fetchProjects();
-    this.fetchImportedPapers();
   },
   methods: {
     // Paper selection methods
@@ -284,9 +238,7 @@ export default {
       return this.selectedPapers.some(p => this.isSamePaper(p, paper));
     },
     
-    isImportedSelected(paperId) {
-      return this.selectedImportedPapers.includes(paperId);
-    },
+    // Paper selection methods for imported papers moved to ImportedPapersSection component
     
     isSamePaper(paper1, paper2) {
       // Compare by DOI if available
@@ -308,34 +260,11 @@ export default {
       console.log('Selected papers:', this.selectedPapers.length);
     },
     
-    toggleImportedSelection(paperId) {
-      if (this.isImportedSelected(paperId)) {
-        this.selectedImportedPapers = this.selectedImportedPapers.filter(id => id !== paperId);
-      } else {
-        this.selectedImportedPapers.push(paperId);
-      }
-      
-      // Update allImportedSelected status
-      this.updateAllImportedSelected();
-    },
+
     
-    toggleSelectAllImported() {
-      if (this.allImportedSelected) {
-        // Deselect all
-        this.selectedImportedPapers = [];
-        this.allImportedSelected = false;
-      } else {
-        // Select all imported papers
-        this.selectedImportedPapers = this.importedPapers.map(paper => paper.id);
-        this.allImportedSelected = true;
-      }
-    },
+
     
-    updateAllImportedSelected() {
-      this.allImportedSelected = 
-        this.importedPapers.length > 0 && 
-        this.importedPapers.every(paper => this.selectedImportedPapers.includes(paper.id));
-    },
+
     
     toggleSelectAll() {
       console.log('Toggling select all. Current state:', this.allSelected);
@@ -775,11 +704,7 @@ export default {
       console.log('View details:', paper);
     },
     
-    removePaper(paperId) {
-      // Remove a paper from imported list
-      this.importedPapers = this.importedPapers.filter(paper => paper.id !== paperId);
-      this.selectedImportedPapers = this.selectedImportedPapers.filter(id => id !== paperId);
-    },
+    // Paper removal method moved to ImportedPapersSection component
     
     // Project management
     async fetchProjects() {
@@ -845,20 +770,12 @@ export default {
       }
     },
     
-    // Add selected imported papers to project
-    addSelectedImportedToProject() {
-      if (this.selectedImportedPapers.length === 0) {
-        alert('Please select papers to add to a project');
-        return;
+    // Method for handling paper added to project event from ImportedPapersSection
+    handlePaperAddedToProject() {
+      // Refresh the active project data if needed
+      if (this.activeProject) {
+        this.$emit('refresh-project', this.activeProject.id);
       }
-      
-      // Store the selected paper IDs directly as papers to add to project
-      this.papersToAddToProject = this.selectedImportedPapers.map(id => {
-        return { id: id };
-      });
-      
-      // Show project selection modal
-      this.showProjectModal = true;
     },
     
     addToProject(paper) {
@@ -888,6 +805,18 @@ export default {
       
       // Import the selected papers
       this.importSelectedPapers();
+    },
+    
+    // Add selected imported papers to the active project if available
+    addSelectedImportedToProject() {
+      // This method now checks for activeProject first
+      if (this.activeProject && this.activeProject.id) {
+        // We have an active project, call the ImportedPapersSection method directly
+        this.$refs.importedPapersSection.addSelectedImportedToProject();
+      } else {
+        // No active project, show the modal as before
+        this.showProjectModal = true;
+      }
     },
     
     async importSelectedPapers() {
@@ -978,28 +907,10 @@ export default {
       }
     },
     
-    // Fetch imported papers
+    // This method is now a wrapper that delegates to ImportedPapersSection component
     async fetchImportedPapers() {
-      try {
-        console.log('Fetching imported papers');
-        this.importedPapers = await paperService.listImportedPapers();
-        console.log(`Fetched ${this.importedPapers.length} imported papers`);
-        
-        // If papers were removed from the imported list (e.g., added to a project),
-        // clean up the selected array to avoid phantom selections
-        this.selectedImportedPapers = this.selectedImportedPapers.filter(id => 
-          this.importedPapers.some(paper => paper.id === id)
-        );
-        
-        // Update allImportedSelected status
-        this.updateAllImportedSelected();
-      } catch (error) {
-        console.error('Error fetching imported papers:', error);
-        // Don't use mock data - show empty state
-        this.importedPapers = [];
-        this.selectedImportedPapers = [];
-        this.allImportedSelected = false;
-      }
+      // Signal to ImportedPapersSection that it should refresh its data
+      this.$emit('refresh-imported-papers');
     }
   }
 }

@@ -755,7 +755,7 @@
 
 <script>
 import { API_ROUTES } from '../config.js';
-import { paperService } from '../services/api.js';
+import { paperService, processingService } from '../services/api.js';
 
 export default {
   name: 'PaperProcessing',
@@ -789,7 +789,11 @@ export default {
     },
     activeProject: {
       type: Object,
-      required: true
+      required: true,
+      validator: (project) => {
+        // Validate that the project has an id
+        return project && project.id;
+      }
     }
   },
   data() {
@@ -860,6 +864,24 @@ export default {
           this.localSelectedPapers = [...newVal];
         }
       }
+    },
+    activeProject: {
+      immediate: true,
+      handler(newProject, oldProject) {
+        // When the active project changes, refresh the data
+        if (newProject && newProject.id) {
+          if (!oldProject || newProject.id !== oldProject.id) {
+            console.log(`Active project changed to ${newProject.name} (${newProject.id}), refreshing data...`);
+            this.fetchPapers();
+            this.fetchPaperCounts();
+          }
+        } else {
+          console.warn('Active project is undefined or missing ID');
+          this.papers = [];
+          this.totalPapers = 0;
+          this.error = "No active project selected. Please select a project first.";
+        }
+      }
     }
   },
   mounted() {
@@ -873,33 +895,42 @@ export default {
       
       try {
         if (!this.activeProject || !this.activeProject.id) {
-          throw new Error('No active project selected');
+          this.papers = []; // Clear papers if no active project
+          this.totalPapers = 0;
+          this.totalPages = 1;
+          console.warn("PaperProcessing: No active project ID available.");
+          this.error = "No active project selected. Please select a project first.";
+          return; // Exit if no active project
         }
 
-        // Build query parameters
-        const params = new URLSearchParams();
-        params.append('skip', ((this.currentPage - 1) * this.itemsPerPage).toString());
-        params.append('limit', this.itemsPerPage.toString());
+        // Build filters object
+        const filters = {};
+        if (this.searchQuery) filters.search = this.searchQuery;
+        if (this.sortBy) filters.sort_by = this.sortBy;
         
-        if (this.sortBy) {
-          params.append('sort_by', this.sortBy);
+        // Add PDF status filter
+        if (this.activeTab === 'retrieve' && this.pdfFilterType !== 'all') {
+          filters.pdf_status = this.pdfFilterType;
         }
         
-        if (this.searchQuery) {
-          params.append('search', this.searchQuery);
+        // Add paper status filter
+        if (this.activeTab === 'cleanup' && this.filterType !== 'all') {
+          filters.status = this.filterType;
         }
         
-        // Use the new project-specific processing endpoint
-        const response = await fetch(API_ROUTES.PROCESSING.PROJECT_PROCESSING(this.activeProject.id) + '?' + params.toString());
+        // Log the active project being used
+        console.log(`Fetching papers for project ${this.activeProject.id} (${this.activeProject.name})`);
         
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to load papers');
-        }
+        // Use the processing service with active project ID
+        const data = await processingService.getPapersForProcessing(
+          this.activeProject.id,
+          (this.currentPage - 1) * this.itemsPerPage,
+          this.itemsPerPage,
+          filters
+        );
         
-        const data = await response.json();
-        this.papers = data;
-        this.totalPapers = data.length;
+        this.papers = data; // Assuming the endpoint returns the list directly
+        this.totalPapers = data.length; // Will be improved when API returns total count
         this.totalPages = Math.ceil(this.totalPapers / this.itemsPerPage);
         
         // Update counts for different PDF statuses
@@ -908,7 +939,7 @@ export default {
         
       } catch (err) {
         this.error = err.message;
-        console.error('Error fetching papers:', err);
+        console.error('Error fetching papers for processing:', err);
       } finally {
         this.isLoading = false;
       }
@@ -916,8 +947,19 @@ export default {
     
     async fetchPaperCounts() {
       try {
-        // Fetch total counts
-        const response = await fetch(API_ROUTES.PROCESSING.COUNTS);
+        if (!this.activeProject || !this.activeProject.id) {
+          // Reset counts if no active project
+          this.totalPapers = 0;
+          this.duplicateCount = 0;
+          this.incompleteCount = 0;
+          this.missingPdfCount = 0;
+          this.availablePdfCount = 0;
+          this.totalPages = 1;
+          return;
+        }
+        
+        // Fetch total counts with project ID as query parameter
+        const response = await fetch(`${API_ROUTES.PROCESSING.COUNTS}?project_id=${this.activeProject.id}`);
         
         if (response.ok) {
           const data = await response.json();
@@ -940,14 +982,17 @@ export default {
       this.error = null;
       
       try {
-        const response = await fetch(API_ROUTES.PROCESSING.FIND_DUPLICATES);
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to find duplicates');
+        if (!this.activeProject || !this.activeProject.id) {
+          alert('Please select an active project first.');
+          return;
         }
         
-        const data = await response.json();
+        console.log(`Finding duplicates for project ${this.activeProject.id}`);
+        
+        // Use the processing service with project ID
+        const data = await processingService.findProjectDuplicates(this.activeProject.id);
+        
+        console.log(`Duplicate detection complete. Found ${data.length} potential duplicate groups`);
         
         if (data.length > 0) {
           // Set filter to duplicates to show the results
@@ -972,24 +1017,30 @@ export default {
     async retrieveAllMissingPDFs() {
       if (this.isRetrieving) return;
       
+      if (!this.activeProject || !this.activeProject.id) {
+        alert('Please select an active project first.');
+        return;
+      }
+      
       this.isRetrieving = true;
       
       try {
-        // Fetch all papers with missing PDFs
-        const params = new URLSearchParams();
-        params.append('filter_type', 'missing_pdf');
-        params.append('limit', '100'); // Retrieve up to 100 papers to process
+        // Fetch all papers with missing PDFs for this project
+        const filters = {
+          pdf_status: 'missing',
+          limit: 100 // Retrieve up to 100 papers to process
+        };
         
-        const response = await fetch(`${API_ROUTES.PROCESSING.CLEANUP}?${params.toString()}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch papers with missing PDFs');
-        }
-        
-        const papers = await response.json();
+        // Use the processing service
+        const papers = await processingService.getPapersForProcessing(
+          this.activeProject.id,
+          0, // Start from the first paper
+          100, // Get up to 100 papers
+          filters
+        );
         
         if (papers.length === 0) {
-          alert('No papers with missing PDFs found.');
+          alert('No papers with missing PDFs found in this project.');
           return;
         }
         
@@ -1007,17 +1058,11 @@ export default {
             // Add to retrieving set
             this.retrievingPapers.add(paper.id);
             
-            const retrieveResponse = await fetch(API_ROUTES.PROCESSING.RETRIEVE_PDF(paper.id), {
-              method: 'POST'
-            });
+            // Use the processing service
+            const result = await processingService.retrievePdfForPaper(paper.id);
             
-            if (retrieveResponse.ok) {
-              const result = await retrieveResponse.json();
-              if (result.success) {
-                successCount++;
-              } else {
-                failCount++;
-              }
+            if (result.success) {
+              successCount++;
             } else {
               failCount++;
             }
@@ -1050,33 +1095,18 @@ export default {
         return;
       }
       
+      // Add to retrieving set
+      this.retrievingPapers.add(paper.id);
+      
       try {
-        // Add to retrieving set
-        this.retrievingPapers.add(paper.id);
+        console.log(`Retrieving PDF for paper ID: ${paper.id}, DOI: ${paper.doi}`);
         
-        const response = await fetch(API_ROUTES.PROCESSING.RETRIEVE_PDF(paper.id), {
-          method: 'POST'
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to retrieve PDF');
-        }
-        
-        const result = await response.json();
+        // Use the processing service
+        const result = await processingService.retrievePdfForPaper(paper.id);
         
         if (result.success) {
-          // Update the paper in the list
-          const index = this.papers.findIndex(p => p.id === paper.id);
-          if (index !== -1) {
-            this.papers[index].pdfStatus = 'available';
-            this.papers[index].status = 'ready_to_code'; // Update status to ready_to_code
-          }
-          
-          // Update counts
-          this.missingPdfCount = Math.max(0, this.missingPdfCount - 1);
-          this.availablePdfCount++;
-          
+          // Refresh the papers list (status changed to ready_to_code)
+          await this.fetchPapers();
           alert('PDF retrieved successfully and paper marked as ready for coding.');
         } else {
           alert('No open access PDF found for this paper.');
@@ -1094,24 +1124,18 @@ export default {
     // Mark paper as ready for coding (when PDF isn't available but coding can proceed)
     async markPaperReady(paper) {
       try {
-        const response = await fetch(API_ROUTES.PROCESSING.MARK_READY(paper.id), {
-          method: 'PUT'
-        });
+        console.log(`Marking paper ID: ${paper.id} as ready for coding`);
         
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to mark paper as ready');
-        }
-        
-        // Update paper in the list
-        const index = this.papers.findIndex(p => p.id === paper.id);
-        if (index !== -1) {
-          this.papers[index].status = 'ready_to_code';
-        }
+        // Use the processing service
+        await processingService.markPaperReady(paper.id);
         
         alert('Paper marked as ready for coding.');
         // Refresh the papers list since status changed
         await this.fetchPapers();
+        
+        // If paper was marked ready, its status should be set to 'ready_to_code'
+        // This means it will appear in the coding view
+        console.log(`Paper ${paper.id} status updated to ready_to_code`);
         
       } catch (err) {
         console.error('Error marking paper as ready:', err);
@@ -1522,8 +1546,20 @@ export default {
     },
     
     goToCoding() {
-      // Emit event to parent to change view
-      this.$emit('change-view', 'codingSheet');
+      // Check if any papers are ready for coding
+      const readyPapers = this.papers.filter(p => 
+        p.pdfStatus === 'available' || 
+        p.status === 'ready_to_code'
+      );
+      
+      if (readyPapers.length === 0) {
+        alert('No papers are ready for coding. Please process at least one paper first.');
+        return;
+      }
+      
+      // Emit event to parent to change view, passing the active project
+      this.$emit('change-view', 'coding', this.activeProject.id);
+      console.log(`Navigating to coding view for project ${this.activeProject.id}`);
     },
     
     toggleFilters() {
