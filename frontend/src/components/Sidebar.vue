@@ -53,9 +53,9 @@
       />
       <SidebarItem 
         icon="PenLine" 
-        text="Coding Sheet" 
-        :active="activeView === 'codingSheet'" 
-        @click="changeView('codingSheet')" 
+        text="Coding" 
+        :active="activeView === 'codingList' || activeView === 'codingSheet'" 
+        @click="changeView('coding')" 
         :disabled="!activeProject"
       />
       <SidebarItem 
@@ -154,12 +154,18 @@ export default {
     ...mapActions(useProjectStore, ['setActiveProject', 'clearActiveProject', 'fetchProjects']),
     changeView(view) {
       // If no active project and trying to access a protected view, show project selector
-      const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'resultsTable'];
+      const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'codingList', 'resultsTable'];
       if (!this.activeProject && protectedViews.includes(view)) {
          console.warn("Cannot navigate: No active project selected.");
          return;
       }
-      this.$emit('change-view', view);
+      
+      // Special handling for coding navigation
+      if (view === 'coding') {
+        this.$emit('change-view', 'codingList');
+      } else {
+        this.$emit('change-view', view);
+      }
     },
 
     // fetchProjects now comes from Pinia store

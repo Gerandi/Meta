@@ -13,6 +13,8 @@ from app.models.project import paper_project
 from app.schemas.paper import Paper as PaperSchema
 from app.services.paper import get_paper_by_id, update_paper, list_papers
 from app.services.pdf_service import get_paper_pdf_url
+from app.services.openalex_direct import get_paper_by_doi_direct, search_papers_direct
+from app.services.pdf_extraction import merge_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +140,7 @@ async def update_paper_metadata(
     return updated_paper
 
 
-@router.get("/papers/find-duplicates", response_model=List[Dict[str, Any]])
+@router.get("/find-duplicates", response_model=List[Dict[str, Any]])
 async def find_duplicate_papers(
     db: Session = Depends(get_db),
     project_id: Optional[int] = Query(None, description="Filter by project ID")
@@ -230,22 +232,73 @@ async def retrieve_pdf_for_paper(
                 "open_access_url": pdf_url,
                 "status": PaperStatus.READY_TO_CODE
             }
-            update_paper(db, paper_id, update_data)
-            
-            return {
-                "success": True,
-                "pdf_url": pdf_url,
-                "message": "PDF URL retrieved and paper ready for coding"
-            }
+            updated_paper = update_paper(db, paper_id, update_data) # Use the service
+            logger.info(f"PDF URL found for paper {paper_id}. Status updated to READY_TO_CODE.")
+            return { "success": True, "pdf_url": pdf_url, "message": "PDF URL retrieved and paper ready for coding" }
         else:
-            return {
-                "success": False,
-                "message": "No open access PDF found for this paper"
-            }
+            # PDF URL was not found, do NOT update status
+            logger.warning(f"No open access PDF found for paper {paper_id} (DOI: {paper.doi}). Status remains {paper.status}.")
+            return { "success": False, "message": "No open access PDF found for this paper" }
     except Exception as e:
         logger.error(f"Error retrieving PDF for paper {paper_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving PDF: {str(e)}")
 
+
+@router.post("/papers/{paper_id}/fetch-metadata", response_model=PaperSchema)
+async def fetch_and_update_metadata(
+    paper_id: int = Path(..., description="The ID of the paper to fetch metadata for"),
+    db: Session = Depends(get_db)
+):
+    """Fetches metadata from OpenAlex based on DOI or title/author and updates the paper."""
+    db_paper = get_paper_by_id(db, paper_id)
+    if not db_paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    api_metadata = None
+    try:
+        if db_paper.doi:
+            logger.info(f"Fetching metadata for paper {paper_id} using DOI: {db_paper.doi}")
+            api_metadata = await get_paper_by_doi_direct(db_paper.doi)
+        elif db_paper.title:
+            logger.info(f"Fetching metadata for paper {paper_id} using title: {db_paper.title}")
+            # Extract first author for search
+            author_name = None
+            if db_paper.authors and len(db_paper.authors) > 0:
+                 # Assuming authors is stored as list of dicts {'name': '...'}
+                 author_name = db_paper.authors[0].get('name')
+
+            results, count = await search_papers_direct(
+                query=db_paper.title,
+                author=author_name,
+                per_page=1,
+                sort="relevance"
+            )
+            if results:
+                api_metadata = results[0]
+        else:
+            raise HTTPException(status_code=400, detail="Paper has no DOI or title to search with.")
+
+        if api_metadata:
+            # Convert current paper model to dict for merging
+            current_metadata = PaperSchema.from_orm(db_paper).dict()
+            # Merge existing data with API data
+            merged_data = merge_metadata(current_metadata, api_metadata)
+
+            # Prepare update data, excluding non-updatable fields like id, created_at
+            update_data = {k: v for k, v in merged_data.items() if hasattr(PaperModel, k) and k not in ['id', 'created_at', 'updated_at']}
+
+            # Perform the update
+            updated_paper = update_paper(db, paper_id, update_data)
+            logger.info(f"Successfully updated metadata for paper {paper_id}")
+            return updated_paper
+        else:
+            logger.warning(f"Could not find metadata on OpenAlex for paper {paper_id}")
+            # Return the original paper if no metadata found
+            return db_paper
+
+    except Exception as e:
+        logger.exception(f"Error fetching/updating metadata for paper {paper_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch or update metadata: {str(e)}")
 
 # Add a new endpoint to manually mark a paper as ready for coding
 @router.put("/papers/{paper_id}/mark-ready", response_model=PaperSchema)

@@ -146,9 +146,11 @@ export default {
       
       try {
         if (!this.projectId) {
+          console.warn("ResultsTable: projectId is missing. Cannot fetch results.");
           this.rows = [];
           this.columns = [];
           this.totalDataPoints = 0;
+          this.error = "No project selected.";
           this.loading = false;
           return;
         }
@@ -167,7 +169,15 @@ export default {
         this.loading = false;
       } catch (err) {
         console.error('Error fetching results:', err);
-        this.error = 'Failed to load results. Please try again: ' + err.message;
+        
+        // Check for specific "No coding sheet found" error
+        if (err.message && err.message.toLowerCase().includes('no coding sheet found')) {
+          this.error = 'No coding sheet has been configured for this project yet.';
+          this.rows = []; // Ensure table is empty
+          this.columns = [];
+        } else {
+          this.error = 'Failed to load results. Please try again: ' + err.message;
+        }
         this.loading = false;
       }
     },

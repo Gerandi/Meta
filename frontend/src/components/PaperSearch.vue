@@ -36,6 +36,7 @@
               :totalPages="totalPages"
               :selectedPapers="selectedPapers"
               :allSelected="allSelected"
+              :importedPaperIds="importedPaperIds"
               @search="searchPapers"
               @update:searchQuery="searchQuery = $event"
               @update:filters="filters = $event"
@@ -213,6 +214,7 @@ export default {
       currentPage: 1,
       totalPages: 1,
       itemsPerPage: APP_CONFIG.ITEMS_PER_PAGE,
+      importedPaperIds: new Set(),
       
       // Upload tab
       uploadQueue: [],
@@ -709,6 +711,7 @@ export default {
     viewDetails(paper) {
       // View paper details
       console.log('View details:', paper);
+      this.$emit('view-details', paper);
     },
     
     // Paper removal method moved to ImportedPapersSection component
@@ -822,6 +825,10 @@ export default {
         const result = await paperService.importPapersBatch([formattedPaper]);
         if (result.imported_count > 0) {
           alert(`Paper "${formattedPaper.title}" imported. Go to 'Imported Papers' to add it to a project.`);
+          // Add imported paper ID to set
+          if (result.imported_papers && result.imported_papers[0] && result.imported_papers[0].id) {
+            this.importedPaperIds.add(result.imported_papers[0].id);
+          }
           // Refresh the imported papers list
           this.$refs.importedPapersSection?.fetchImportedPapers();
         } else {

@@ -108,7 +108,7 @@ async def search_papers_direct(
         if author and isinstance(author, str) and author.strip():
             # Remove any characters that might cause issues with the API
             safe_author = author.strip().replace('"', '').replace(':', '')
-            filters.append(f"author.display_name.search:{safe_author}")
+            filters.append(f"authorships.author.display_name.search:{safe_author}")
             
         # Open access filter
         if open_access_only:

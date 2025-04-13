@@ -169,6 +169,7 @@
               :paper="paper"
               :selected="isSelected(paper)"
               :activeProject="activeProject"
+              :importedPaperIds="importedPaperIds"
               @toggle-selection="$emit('toggle-selection', paper)"
               @view="$emit('view-paper', paper)"
               @download="$emit('download-pdf', paper)"
@@ -256,6 +257,10 @@ export default {
     allSelected: {
       type: Boolean,
       default: false
+    },
+    importedPaperIds: {
+      type: Set,
+      default: () => new Set()
     }
   },
   emits: [

@@ -24,10 +24,13 @@
         <Download class="mr-1" size="16" /> Download PDF
       </button>
       <button 
-        class="flex items-center text-indigo-600 mr-4 hover:text-indigo-800"
-        @click.stop="handleImportAction"
+        class="flex items-center mr-4"
+        :class="isImported ? 'text-green-600 cursor-default' : 'text-indigo-600 hover:text-indigo-800'"
+        @click.stop="!isImported && handleImportAction()"
+        :disabled="isImported"
       >
-        <PlusCircle class="mr-1" size="16" /> Import
+        <component :is="isImported ? 'CheckCircle' : 'PlusCircle'" class="mr-1" size="16" />
+        {{ isImported ? 'Imported' : 'Import' }}
       </button>
       <button 
         class="flex items-center text-indigo-600 hover:text-indigo-800"
@@ -40,7 +43,7 @@
 </template>
 
 <script>
-import { Database, Download, PlusCircle, Book } from 'lucide-vue-next';
+import { Database, Download, PlusCircle, Book, CheckCircle } from 'lucide-vue-next';
 import { useProjectStore } from '../../../stores/project';
 import { mapState } from 'pinia';
 
@@ -60,11 +63,21 @@ export default {
     selected: {
       type: Boolean,
       default: false
+    },
+    importedPaperIds: {
+      type: Set,
+      required: true
     }
     // activeProject prop removed - now using Pinia store
   },
   computed: {
     ...mapState(useProjectStore, ['activeProject', 'hasActiveProject']),
+    isImported() {
+      // Check if the paper's DOI or title exists in the imported set
+      return this.importedPaperIds.has(this.paper.id) || // Check if backend returns ID now
+             (this.paper.doi && this.importedPaperIds.has(this.paper.doi)) || // Fallback check
+             this.importedPaperIds.has(this.paper.title); // Least reliable fallback
+    }
   },
   emits: ['download', 'view-details', 'import-to-project', 'import-to-staging'],
   methods: {

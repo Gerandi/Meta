@@ -10,8 +10,9 @@
           class="flex items-center px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"
           @click="addSelectedImportedToProject"
           :disabled="selectedImportedPapers.length === 0"
+          :class="{'opacity-50 cursor-not-allowed': selectedImportedPapers.length === 0}"
         >
-          <PlusCircle class="mr-1" size="16" /> Add to Project
+          <PlusCircle class="mr-1" size="16" /> Add Selected to Active Project
         </button>
       </div>
     </div>

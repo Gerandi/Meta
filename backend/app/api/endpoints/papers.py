@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, status, UploadFile, File, Form, BackgroundTasks
-from fastapi.responses import FileResponse
-from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session
+from fastapi.responses import FileResponse, StreamingResponse
 import httpx
+from typing import List, Optional, Dict, Any, Set
+from sqlalchemy.orm import Session
 import json
 import csv
 import logging
@@ -13,13 +13,14 @@ from io import StringIO
 
 logger = logging.getLogger(__name__)
 
-from app.schemas.paper import Paper, PaperCreate
+from app.schemas.paper import Paper as PaperSchema, PaperCreate
+from app.models.paper import Paper as PaperModel
 from app.services.paper import create_paper, get_paper_by_id, update_paper, delete_paper, list_papers, list_imported_papers
 from app.models.paper import PaperStatus
 from app.services.pdf_service import get_paper_pdf_url, get_paper_details
 from app.services.doi_service import get_doi_for_paper, get_dois_for_papers
 from app.services.openalex_direct import search_papers_direct
-from app.services.pdf_extraction import process_pdf_file, extract_metadata_from_pdf, enhance_metadata_with_api
+from app.services.pdf_extraction import process_pdf_file, extract_metadata_from_pdf, enhance_metadata_with_api, store_pdf_file
 from app.services.project import add_paper_to_project
 from app.db.session import get_db
 
@@ -33,17 +34,17 @@ async def get_paper_counts(
     """
     Get counts of papers by various criteria.
     """
-    # Count total papers
-    total_count = db.query(Paper).count()
+    # Count total papers using the MODEL
+    total_count = db.query(PaperModel).count()
     
-    # Count papers with PDFs
-    with_pdf_count = db.query(Paper).filter(Paper.file_path.isnot(None)).count()
+    # Count papers with PDFs using the MODEL
+    with_pdf_count = db.query(PaperModel).filter(PaperModel.file_path.isnot(None)).count()
     
-    # Count papers with DOIs
-    with_doi_count = db.query(Paper).filter(Paper.doi.isnot(None)).count()
+    # Count papers with DOIs using the MODEL
+    with_doi_count = db.query(PaperModel).filter(PaperModel.doi.isnot(None)).count()
     
-    # Count open access papers
-    open_access_count = db.query(Paper).filter(Paper.is_open_access == True).count()
+    # Count open access papers using the MODEL
+    open_access_count = db.query(PaperModel).filter(PaperModel.is_open_access == True).count()
     
     return {
         "total": total_count,
@@ -53,7 +54,7 @@ async def get_paper_counts(
     }
 
 
-@router.get("/cleanup", response_model=List[Paper])
+@router.get("/cleanup", response_model=List[PaperSchema])
 async def list_papers_for_cleanup(
     skip: int = Query(0, description="Number of papers to skip"),
     limit: int = Query(100, description="Maximum number of papers to return"),
@@ -63,21 +64,21 @@ async def list_papers_for_cleanup(
     """
     Get a list of papers with pagination and sorting for cleanup purposes.
     """
-    query = db.query(Paper)
+    query = db.query(PaperModel)
     
     # Add sorting
     if sort_by == "title":
-        query = query.order_by(Paper.title)
+        query = query.order_by(PaperModel.title)
     elif sort_by == "date":
-        query = query.order_by(Paper.publication_date.desc())
+        query = query.order_by(PaperModel.publication_date.desc())
     elif sort_by == "journal":
-        query = query.order_by(Paper.journal)
+        query = query.order_by(PaperModel.journal)
     
     papers = query.offset(skip).limit(limit).all()
     return papers
 
 
-@router.post("/", response_model=Paper, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=PaperSchema, status_code=status.HTTP_201_CREATED)
 async def save_paper(
     paper: PaperCreate,
     db: Session = Depends(get_db),
@@ -89,7 +90,19 @@ async def save_paper(
     return create_paper(db, paper)
 
 
-@router.get("/{paper_id}", response_model=Paper)
+@router.get("/imported", response_model=List[PaperSchema])
+async def get_imported_papers(
+    skip: int = Query(0, description="Number of papers to skip"),
+    limit: int = Query(100, description="Maximum number of papers to return"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get papers that have been imported but not yet added to a project.
+    """
+    return list_imported_papers(db, skip, limit)
+
+
+@router.get("/{paper_id}", response_model=PaperSchema)
 async def get_paper(
     paper_id: int = Path(..., description="The ID of the paper to retrieve"),
     db: Session = Depends(get_db),
@@ -103,7 +116,7 @@ async def get_paper(
     return db_paper
 
 
-@router.patch("/{paper_id}", response_model=Paper)
+@router.patch("/{paper_id}", response_model=PaperSchema)
 async def update_paper_details(
     paper_id: int = Path(..., description="The ID of the paper to update"),
     paper_data: Dict[str, Any] = None,
@@ -125,6 +138,33 @@ async def delete_paper_by_id(
     """
     delete_paper(db, paper_id)
     return None
+
+
+@router.post("/batch-delete", status_code=status.HTTP_200_OK, response_model=Dict[str, Any])
+async def batch_delete_papers(
+    paper_ids: List[int],  # This will be the request body
+    db: Session = Depends(get_db),
+):
+    """
+    Delete multiple papers by their IDs.
+    """
+    success_count = 0
+    failed_ids: Set[int] = set()
+    
+    for paper_id in paper_ids:
+        try:
+            delete_paper(db, paper_id)
+            success_count += 1
+        except Exception as e:
+            logger.error(f"Failed to delete paper ID {paper_id}: {str(e)}")
+            failed_ids.add(paper_id)
+    
+    return {
+        "success": True,
+        "deleted_count": success_count,
+        "failed_count": len(failed_ids),
+        "failed_ids": list(failed_ids)
+    }
 
 
 @router.get("/{paper_id}/content", response_class=FileResponse)
@@ -158,19 +198,47 @@ async def get_paper_content(
     return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
 
 
-@router.get("/imported", response_model=List[Paper])
-async def get_imported_papers(
-    skip: int = Query(0, description="Number of papers to skip"),
-    limit: int = Query(100, description="Maximum number of papers to return"),
-    db: Session = Depends(get_db),
+@router.get("/{paper_id}/proxy-pdf", response_class=StreamingResponse)
+async def proxy_external_pdf(
+    paper_id: int = Path(..., description="The ID of the paper"),
+    db: Session = Depends(get_db)
 ):
-    """
-    Get papers that have been imported but not yet added to a project.
-    """
-    return list_imported_papers(db, skip, limit)
+    """Proxies an external PDF URL to avoid CORS issues in the frontend viewer."""
+    db_paper = get_paper_by_id(db, paper_id)
+    if not db_paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    pdf_url = db_paper.open_access_url # Get the stored external URL
+    if not pdf_url:
+        raise HTTPException(status_code=404, detail="No external PDF URL associated with this paper")
+    async def stream_pdf():
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+                async with client.stream("GET", pdf_url) as response:
+                    if response.status_code != 200:
+                        logger.error(f"Failed to fetch external PDF from {pdf_url}. Status: {response.status_code}")
+                        # Raise exception to be caught below
+                        response.raise_for_status()
+                    # Stream the content chunk by chunk
+                    async for chunk in response.aiter_bytes():
+                        yield chunk
+        except httpx.RequestError as exc:
+            logger.error(f"Error requesting external PDF {pdf_url}: {exc}")
+            # You might want to yield an error message or handle differently
+            # For now, let the exception propagate to the main handler
+            raise HTTPException(status_code=502, detail=f"Failed to fetch PDF from source: {exc}")
+        except Exception as e:
+            logger.error(f"Unexpected error streaming PDF from {pdf_url}: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error during PDF proxy")
+    # Determine filename for download suggestion
+    filename = f"paper_{paper_id}_{db_paper.title[:20].replace(' ', '_')}.pdf"
+    return StreamingResponse(
+        stream_pdf(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=\"{filename}\""} # Suggest filename
+    )
 
 
-@router.get("/", response_model=List[Paper])
+@router.get("/", response_model=List[PaperSchema])
 async def get_papers(
     skip: int = Query(0, description="Number of papers to skip"),
     limit: int = Query(100, description="Maximum number of papers to return"),
@@ -355,10 +423,11 @@ async def batch_find_dois(
         raise HTTPException(status_code=500, detail=f"Error processing CSV file: {str(e)}")
 
 
-@router.post("/upload", response_model=Paper)
+@router.post("/upload", response_model=PaperSchema)
 async def upload_pdf(
     file: UploadFile = File(...),
-    project_id: Optional[int] = Query(None, description="Optional project ID to associate the file with"),
+    project_id: Optional[int] = Form(None, description="Optional project ID to associate the file with"),
+    paper_id: Optional[int] = Form(None, description="Optional existing paper ID to associate the PDF with"),
     db: Session = Depends(get_db),
 ):
     """
@@ -380,12 +449,35 @@ async def upload_pdf(
         
         # Read the file contents
         file_content = await file.read()
-        
-        # Process the PDF file - extract metadata and store file
-        metadata = await process_pdf_file(file_content, file.filename, project_id)
-        
-        # Create PaperCreate object from metadata
-        paper_data = {
+
+        # --- Logic for associating with existing paper ---
+        if paper_id:
+            db_paper = get_paper_by_id(db, paper_id)
+            if not db_paper:
+                raise HTTPException(status_code=404, detail=f"Paper with ID {paper_id} not found")
+
+            # Store the file
+            file_path = await store_pdf_file(file_content, file.filename, project_id or db_paper.projects[0].id if db_paper.projects else None)
+            if not file_path:
+                 raise HTTPException(status_code=500, detail="Failed to store uploaded PDF file")
+
+            # Update existing paper's file_path and status
+            update_data = {
+                "file_path": file_path,
+                "status": PaperStatus.READY_TO_CODE # Update status
+            }
+            updated_paper = update_paper(db, paper_id, update_data)
+            logger.info(f"Associated uploaded PDF {file.filename} with existing paper {paper_id}. Status updated.")
+            return updated_paper
+        # --- End of existing paper logic ---
+
+        # --- Original logic for creating new paper ---
+        else:
+            # Process the PDF file - extract metadata and store file
+            metadata = await process_pdf_file(file_content, file.filename, project_id)
+            
+            # Create PaperCreate object from metadata
+            paper_data = {
             "title": metadata.get("title") or "Unknown Title",
             "authors": metadata.get("authors") or [],
             "doi": metadata.get("doi"),

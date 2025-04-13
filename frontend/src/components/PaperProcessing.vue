@@ -1,6 +1,8 @@
 
 <template>
   <div class="p-6 bg-gray-100 min-h-screen">
+    <!-- Hidden file input for single PDF upload -->
+    <input type="file" ref="pdfUploadInput" @change="handlePdfUpload($event)" style="display:none" accept=".pdf" />
     <div class="flex justify-between items-center mb-6">
       <div>
         <h1 class="text-2xl font-bold">Process Papers</h1>
@@ -211,7 +213,10 @@
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button class="text-indigo-600 hover:text-indigo-900 mr-3" @click="editPaper(paper)">
-                    Edit
+                    Edit Metadata
+                  </button>
+                  <button class="text-indigo-600 hover:text-indigo-900 mr-3" @click="fetchMetadata(paper)">
+                    Fetch Metadata
                   </button>
                   <button class="text-red-600 hover:text-red-900" @click="confirmRemove(paper)">
                     Remove
@@ -392,6 +397,9 @@
                     <button class="text-indigo-600 hover:text-indigo-900 mr-3" @click="uploadPdf(paper)">
                       Upload
                     </button>
+                    <button class="text-indigo-600 hover:text-indigo-900 mr-3" @click="addUrl(paper)">
+                      Add URL
+                    </button>
                     <button class="text-indigo-600 hover:text-indigo-900" @click="markPaperReady(paper)">
                       Mark Ready
                     </button>
@@ -567,7 +575,7 @@
                 >
                   <div class="flex justify-between items-center mb-2">
                     <div class="font-medium flex items-center">
-                      <font-awesome-icon icon="file-pdf" class="text-gray-500 mr-2" />
+                      <FileText class="text-gray-500 mr-2" size="16" />
                       {{ file.name }}
                     </div>
                     <div class="text-sm text-gray-500">{{ formatFileSize(file.size) }}</div>
@@ -594,7 +602,7 @@
             </div>
             
             <div v-if="uploadedFiles.length > 0 && uploadedFiles.some(f => f.status === 'complete')" class="flex items-center border rounded-lg p-4 bg-indigo-50 text-indigo-800">
-              <font-awesome-icon icon="check-circle" class="mr-2" />
+              <CheckCircle class="mr-2" size="18" />
               <span>{{ uploadedFiles.filter(f => f.status === 'complete').length }} files uploaded successfully. Continue to match these files with your papers.</span>
               <button 
                 class="ml-auto px-4 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
@@ -617,14 +625,14 @@
                 class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center mr-2"
                 @click="autoMatchPdfs"
               >
-                <font-awesome-icon icon="rotate-right" class="mr-1" /> Auto-Match PDFs
+                <RotateCw class="mr-1" size="16" /> Auto-Match PDFs
               </button>
             </div>
             
             <div v-for="(file, index) in uploadedFiles.filter(f => f.status === 'complete')" :key="index" class="border rounded-lg p-4" :class="file.matched ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'">
               <div class="flex items-start">
                 <div class="h-10 w-10 rounded-full bg-white border flex items-center justify-center mr-3">
-                  <font-awesome-icon icon="file-pdf" class="text-gray-500" />
+                  <FileText class="text-gray-500" size="20" />
                 </div>
                 
                 <div class="flex-1">
@@ -750,16 +758,139 @@
         </div>
       </div>
     </div>
+    
+    <!-- Duplicates Modal -->
+    <div v-if="showDuplicatesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h3 class="font-medium text-lg">Potential Duplicate Papers</h3>
+          <button 
+            class="text-gray-400 hover:text-gray-600"
+            @click="showDuplicatesModal = false"
+          >
+            <X size="18" />
+          </button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto p-6">
+          <div v-if="duplicateGroups.length === 0" class="text-center py-12">
+            <FolderOpen class="text-gray-400 mx-auto mb-4" size="48" />
+            <h3 class="text-xl font-medium mb-2">No Duplicates Found</h3>
+            <p class="text-gray-600">All papers in this project appear to be unique.</p>
+          </div>
+          
+          <div v-else>
+            <p class="mb-4 text-gray-600">
+              We found {{ duplicateGroups.length }} groups of potential duplicate papers. 
+              Review each group and select papers to remove.
+            </p>
+            
+            <div v-for="(group, index) in duplicateGroups" :key="index" class="border rounded-lg mb-6 overflow-hidden">
+              <div class="bg-gray-50 px-4 py-3 border-b">
+                <h4 class="font-medium">Duplicate Group {{ index + 1 }}: {{ group.title }}</h4>
+              </div>
+              
+              <div class="divide-y">
+                <div v-for="paper in group.papers" :key="paper.id" class="p-4 flex items-center">
+                  <input 
+                    type="checkbox" 
+                    :value="paper.id"
+                    v-model="selectedDuplicates"
+                    class="h-5 w-5 text-indigo-600 focus:ring-indigo-500 mr-3"
+                  />
+                  <div class="flex-1">
+                    <div class="font-medium">{{ paper.title }}</div>
+                    <div class="text-sm text-gray-500 flex items-center justify-between">
+                      <span>{{ paper.authors.join(', ') }}</span>
+                      <span>{{ paper.journal }} ({{ paper.year || 'Unknown Year' }})</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="p-4 border-t flex justify-between bg-gray-50">
+          <div class="text-sm text-gray-700">
+            {{ selectedDuplicates.length }} papers selected for removal
+          </div>
+          <div>
+            <button 
+              class="px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-100 mr-2"
+              @click="showDuplicatesModal = false"
+            >
+              Cancel
+            </button>
+            <button 
+              class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center"
+              @click="removeSelectedDuplicates"
+              :disabled="selectedDuplicates.length === 0"
+            >
+              <Trash2 class="mr-1" size="16" /> Remove Selected Duplicates
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import { API_ROUTES } from '../config.js';
 import { paperService, processingService } from '../services/api.js';
+import { 
+  Filter, 
+  CheckCircle, 
+  RotateCw, 
+  Trash2, 
+  Download, 
+  FolderOpen,
+  ChevronUp,
+  ChevronDown,
+  Settings,
+  HelpCircle,
+  Edit,
+  PlusCircle,
+  Clock,
+  Search,
+  RefreshCw,
+  AlertTriangle,
+  Check,
+  Copy,
+  UploadCloud,
+  Link,
+  Loader2,
+  FileText,
+  X
+} from 'lucide-vue-next';
 
 export default {
   name: 'PaperProcessing',
   components: {
+    Filter,
+    CheckCircle,
+    RotateCw,
+    Trash2,
+    Download,
+    FolderOpen,
+    ChevronUp,
+    ChevronDown,
+    Settings,
+    HelpCircle,
+    Edit,
+    PlusCircle,
+    Clock,
+    Search,
+    RefreshCw,
+    AlertTriangle,
+    Check,
+    Copy,
+    UploadCloud,
+    Link,
+    Loader2,
+    FileText,
+    X,
     TabButton: {
       props: {
         label: String,
@@ -776,7 +907,8 @@ export default {
           ]"
           @click="$emit('click')"
         >
-          <span class="mr-2"><font-awesome-icon :icon="icon" /></span>
+          <FileText v-if="icon === 'file-text'" class="mr-2" size="18" />
+          <Download v-else-if="icon === 'download'" class="mr-2" size="18" />
           {{ label }}
         </button>
       `
@@ -822,6 +954,11 @@ export default {
       showUploadModal: false,
       showUrlModal: false,
       showConfirmationModal: false,
+      showDuplicatesModal: false,
+      
+      // Duplicates
+      duplicateGroups: [],
+      selectedDuplicates: [],
       
       // Edit form
       editForm: {
@@ -994,13 +1131,15 @@ export default {
         
         console.log(`Duplicate detection complete. Found ${data.length} potential duplicate groups`);
         
+        // Store the duplicate groups
+        this.duplicateGroups = data;
+        
         if (data.length > 0) {
-          // Set filter to duplicates to show the results
-          this.filterType = 'duplicates';
-          await this.fetchPapers();
+          // Clear previously selected duplicates
+          this.selectedDuplicates = [];
           
-          // Show confirmation with results
-          alert(`Found ${data.length} potential duplicate groups.`);
+          // Show the duplicates modal
+          this.showDuplicatesModal = true;
         } else {
           alert('No duplicates found.');
         }
@@ -1304,21 +1443,8 @@ export default {
     
     async removeMultiplePapers() {
       try {
-        let successCount = 0;
-        
-        for (const paperId of this.localSelectedPapers) {
-          try {
-            const response = await fetch(`${API_ROUTES.PAPERS.GET_BY_ID(paperId)}`, {
-              method: 'DELETE'
-            });
-            
-            if (response.ok) {
-              successCount++;
-            }
-          } catch (e) {
-            console.error(`Error removing paper ${paperId}:`, e);
-          }
-        }
+        // Use the batch delete endpoint
+        const result = await paperService.batchDeletePapers(this.localSelectedPapers);
         
         // Clear selected papers
         this.localSelectedPapers = [];
@@ -1330,7 +1456,12 @@ export default {
         // Close confirmation modal
         this.showConfirmationModal = false;
         
-        alert(`${successCount} papers removed successfully.`);
+        // Show results
+        if (result.failed_count > 0) {
+          alert(`${result.deleted_count} papers removed successfully. ${result.failed_count} papers could not be removed.`);
+        } else {
+          alert(`${result.deleted_count} papers removed successfully.`);
+        }
         
       } catch (err) {
         console.error('Error removing papers:', err);
@@ -1459,8 +1590,36 @@ export default {
       alert(`${matchedFiles.length} PDFs successfully matched and uploaded.`);
     },
     
+    // Duplicate handling
+    async removeSelectedDuplicates() {
+      if (this.selectedDuplicates.length === 0) return;
+      
+      try {
+        // Use the batch delete endpoint
+        const result = await paperService.batchDeletePapers(this.selectedDuplicates);
+        
+        // Close the duplicates modal
+        this.showDuplicatesModal = false;
+        
+        // Refresh papers and counts
+        await this.fetchPapers();
+        await this.fetchPaperCounts();
+        
+        // Show results
+        if (result.failed_count > 0) {
+          alert(`${result.deleted_count} duplicate papers removed successfully. ${result.failed_count} papers could not be removed.`);
+        } else {
+          alert(`${result.deleted_count} duplicate papers removed successfully.`);
+        }
+        
+      } catch (err) {
+        console.error('Error removing duplicate papers:', err);
+        alert(`Error removing duplicates: ${err.message}`);
+      }
+    },
+    
     // PDF URL functions
-    addPdfUrl(paper) {
+    addUrl(paper) {
       this.selectedPaperForUrl = paper;
       this.pdfUrl = '';
       this.showUrlModal = true;
@@ -1470,18 +1629,14 @@ export default {
       if (!this.selectedPaperForUrl || !this.pdfUrl) return;
       
       try {
-        // In a real implementation, we'd call an API endpoint
-        // For now, just update the UI
-        const paperId = this.selectedPaperForUrl.id;
-        const paperIndex = this.papers.findIndex(p => p.id === paperId);
+        // Use the paperService to update the paper with the URL
+        await paperService.updatePaper(this.selectedPaperForUrl.id, { 
+          open_access_url: this.pdfUrl,
+          status: 'READY_TO_CODE' // Update status to ready for coding
+        });
         
-        if (paperIndex !== -1) {
-          this.papers[paperIndex].pdfStatus = 'available';
-        }
-        
-        // Update counts
-        this.availablePdfCount++;
-        this.missingPdfCount = Math.max(0, this.missingPdfCount - 1);
+        // Refresh the paper list to show updated status
+        await this.fetchPapers();
         
         this.closeUrlModal();
         
@@ -1507,8 +1662,76 @@ export default {
     
     uploadPdf(paper) {
       this.selectedPaperForUrl = paper;
-      this.showUploadModal = true;
-      this.uploadTab = 'upload';
+      // Trigger file input click to open file dialog
+      this.$refs.pdfUploadInput.click();
+    },
+    
+    async handlePdfUpload(event) {
+      if (!event.target.files || !event.target.files.length) return;
+      
+      const file = event.target.files[0];
+      if (!file.type.includes('pdf')) {
+        alert('Please select a PDF file.');
+        return;
+      }
+      
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Add the paper_id to associate with existing paper
+        if (this.selectedPaperForUrl && this.selectedPaperForUrl.id) {
+          formData.append('paper_id', this.selectedPaperForUrl.id);
+        }
+        
+        // Optional: Add project_id if available
+        if (this.activeProject && this.activeProject.id) {
+          formData.append('project_id', this.activeProject.id);
+        }
+        
+        // Use the uploadPaper function from paperService
+        await paperService.uploadPaper(formData, (progress) => {
+          console.log(`Upload progress: ${progress}%`);
+        });
+        
+        // Reset the file input
+        event.target.value = '';
+        
+        // Refresh the paper list
+        await this.fetchPapers();
+        
+        alert('PDF uploaded successfully.');
+        
+      } catch (err) {
+        console.error('Error uploading PDF:', err);
+        alert(`Error uploading PDF: ${err.message}`);
+      }
+    },
+    
+    async fetchMetadata(paper) {
+      try {
+        console.log(`Fetching metadata for paper ID: ${paper.id}`);
+        
+        // Show loading state
+        this.isLoading = true;
+        
+        // Use the processing service
+        const updatedPaper = await processingService.fetchMetadataForPaper(paper.id);
+        
+        // Update the paper in the list
+        const index = this.papers.findIndex(p => p.id === paper.id);
+        if (index !== -1) {
+          this.papers[index] = updatedPaper;
+        }
+        
+        alert('Metadata successfully updated.');
+        
+      } catch (err) {
+        console.error('Error fetching metadata:', err);
+        alert(`Error fetching metadata: ${err.message}`);
+      } finally {
+        this.isLoading = false;
+      }
     },
     
     replacePdf(paper) {

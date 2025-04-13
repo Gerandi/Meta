@@ -1,7 +1,10 @@
 <template>
   <div class="bg-white p-3 rounded border">
     <div class="flex justify-between items-center mb-2">
-      <div class="font-medium">{{ item.name }}</div>
+      <div class="font-medium flex items-center">
+        <FileText class="mr-2 text-gray-500" size="16" />
+        {{ item.name }}
+      </div>
       <div class="flex items-center">
         <span class="text-sm text-gray-500 mr-2">{{ formatFileSize(item.size) }}</span>
         <button v-if="item.status !== 'complete'" 
@@ -35,13 +38,14 @@
 </template>
 
 <script>
-import { X, CheckCircle } from 'lucide-vue-next';
+import { X, CheckCircle, FileText } from 'lucide-vue-next';
 
 export default {
   name: 'UploadItem',
   components: {
     X,
-    CheckCircle
+    CheckCircle,
+    FileText
   },
   props: {
     item: {

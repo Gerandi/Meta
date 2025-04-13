@@ -33,6 +33,7 @@
           :is="currentView" 
           v-bind="componentProps"
           @select-paper="handleSelectPaper"
+          @view-details="handleViewDetails"
           @view-project="handleViewProject"
           @set-active-project="handleSetActiveProject"
           @clear-active-project="handleClearActiveProject"
@@ -42,6 +43,8 @@
           @request-confirmation="showConfirmation"
           @project-list-changed="refreshProjectList"
           @configure-coding-sheet="configureCodingSheet"
+          @configure-sheet="handleConfigureSheet"
+          @start-coding="handleStartCoding"
           @back-to-project="handleBackToProject"
           @coding-saved="refreshResultsTable"
         />
@@ -71,9 +74,11 @@
 import Sidebar from './components/Sidebar.vue';
 import Dashboard from './components/Dashboard.vue';
 import PaperSearch from './components/PaperSearch.vue';
+import PaperDetailView from './components/PaperDetailView.vue';
 import CodingView from './components/CodingView.vue';
 import PaperProcessing from './components/PaperProcessing.vue';
 import CodingSheet from './components/CodingSheet.vue';
+import CodingListView from './components/CodingListView.vue';
 import ResultsTable from './components/ResultsTable.vue';
 import Projects from './components/Projects.vue';
 import ProjectDetail from './components/ProjectDetail.vue';
@@ -83,6 +88,7 @@ import { API_ROUTES } from './config.js';
 import { paperService } from './services/api';
 import { FolderOpen } from 'lucide-vue-next';
 import { useProjectStore } from './stores/project';
+
 import { mapState, mapActions } from 'pinia';
 
 export default {
@@ -91,9 +97,11 @@ export default {
     Sidebar,
     Dashboard,
     PaperSearch,
+    PaperDetailView,
     CodingView,
     PaperProcessing,
     CodingSheet,
+    CodingListView,
     ResultsTable,
     Projects,
     ProjectDetail,
@@ -130,12 +138,16 @@ export default {
           return Dashboard;
         case 'search':
           return PaperSearch;
+        case 'paperDetail':
+          return PaperDetailView;
         case 'viewer':
           return CodingView; // Changed from PdfViewer to CodingView
         case 'processing':
           return PaperProcessing;
         case 'codingSheet':
           return CodingSheet;
+        case 'codingList':
+          return CodingListView;
         case 'resultsTable':
           return ResultsTable;
         case 'projects':
@@ -147,18 +159,32 @@ export default {
       }
     },
     componentProps() {
-      if (this.activeView === 'viewer' && this.selectedPaper) {
-        return { 
-          paper: this.selectedPaper,
-          projectId: this.activeProject ? this.activeProject.id : null 
-        };
+      if (this.activeView === 'viewer') {
+        // Only return valid props if selectedPaper exists
+        if (this.selectedPaper) {
+          return { 
+            paper: this.selectedPaper,
+            projectId: this.activeProject ? this.activeProject.id : null 
+          };
+        } else {
+          console.warn("CodingView rendered without selectedPaper!");
+          return {};
+        }
       }
+
+      if (this.activeView === 'paperDetail' && this.selectedPaper) {
+        return { paper: this.selectedPaper };
+      }
+
       if (this.activeView === 'projectDetail' && this.selectedProjectId) {
         return { projectId: this.selectedProjectId };
       }
       
-      if (this.activeView === 'codingSheet' && this.selectedProjectId) {
-        return { projectId: this.selectedProjectId };
+      if (this.activeView === 'codingSheet') {
+        // Use activeProject.id as fallback if selectedProjectId is not set
+        return { 
+          projectId: this.selectedProjectId || (this.activeProject ? this.activeProject.id : null)
+        };
       }
       
       if (this.activeView === 'resultsTable' && this.activeProject) {
@@ -167,17 +193,31 @@ export default {
           key: this.resultsTableKey // Add key to force refresh when coding is saved
         };
       }
+
       if (this.activeView === 'processing') {
-        return { selectedPapers: this.selectedPapers };
+        // Ensure activeProject is passed to PaperProcessing
+        return { 
+          selectedPapers: this.selectedPapers,
+          activeProject: this.activeProject 
+        };
       }
+      
+      // Pass activeProject to CodingListView
+      if (this.activeView === 'codingList' && this.activeProject) {
+        return {
+          activeProject: this.activeProject
+        };
+      }
+
       // Pass activeProject to components that need it
-      if (['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'resultsTable'].includes(this.activeView)) {
+      if (['dashboard', 'search', 'resultsTable'].includes(this.activeView)) {
         return { activeProject: this.activeProject };
       }
+
       return {};
     },
     needsProject() {
-      const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'resultsTable'];
+      const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'codingList', 'resultsTable'];
       return protectedViews.includes(this.activeView) && !this.hasActiveProject;
     }
   },
@@ -185,7 +225,7 @@ export default {
     ...mapActions(useProjectStore, ['setActiveProject', 'clearActiveProject', 'loadActiveProjectFromStorage']),
     setActiveView(view) {
       // Prevent accessing protected views without an active project
-      const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'resultsTable'];
+      const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'codingList', 'resultsTable'];
       if (!this.hasActiveProject && protectedViews.includes(view)) {
         console.warn(`Cannot navigate to ${view} without an active project.`);
         // Redirect to projects view
@@ -196,11 +236,19 @@ export default {
     },
     
     handleSelectPaper(paper, projectId) {
+      // Set selectedPaper FIRST before changing view
+      if (!paper) {
+        console.error("Cannot select null/undefined paper");
+        return;
+      }
+      
       this.selectedPaper = paper;
       if (projectId) {
         // If a project ID was provided, update the selectedProjectId
         this.selectedProjectId = projectId;
       }
+      
+      // THEN change the view
       this.activeView = 'viewer';
     },
     
@@ -245,6 +293,23 @@ export default {
       } else {
         // Return to the project detail view
         this.activeView = 'projectDetail';
+      }
+    },
+    
+    // Methods to handle events from CodingListView
+    handleStartCoding(paper) {
+      this.selectedPaper = paper; // Set the paper to be coded
+      this.activeView = 'viewer'; // Navigate to the CodingView
+    },
+    
+    handleConfigureSheet() {
+      // Navigate to the coding sheet config view
+      if (this.activeProject) {
+        this.selectedProjectId = this.activeProject.id;
+        this.activeView = 'codingSheet';
+      } else {
+        alert("Please select an active project first.");
+        this.activeView = 'projects';
       }
     },
     
@@ -294,6 +359,12 @@ export default {
       console.log(`${event.papers.length} paper(s) added to project ${event.projectId}`);
       // Optionally show a success message
       this.isProjectModalVisible = false; // Close modal
+    },
+    
+    // View Details Handler
+    handleViewDetails(paper) {
+      this.selectedPaper = paper;
+      this.activeView = 'paperDetail';
     },
     
     // Confirmation Modal Methods

@@ -14,9 +14,11 @@ export const API_ROUTES = {
         BATCH_FIND_DOI: `${API_BASE_URL}/papers/batch-find-doi`,
         GET_PDF: (doi) => `${API_BASE_URL}/papers/pdf/${doi}`,
         GET_CONTENT: (id) => `${API_BASE_URL}/papers/${id}/content`,
+        PROXY_PDF: (id) => `${API_BASE_URL}/papers/${id}/proxy-pdf`,
         UPLOAD: `${API_BASE_URL}/papers/upload`,
         EXTRACT_METADATA: `${API_BASE_URL}/papers/extract-metadata`,
         IMPORT_BATCH: `${API_BASE_URL}/papers/import-batch`,
+        BATCH_DELETE: `${API_BASE_URL}/papers/batch-delete`,
     },
     PROJECTS: {
         LIST: `${API_BASE_URL}/projects/`,
@@ -32,12 +34,13 @@ export const API_ROUTES = {
     },
     PROCESSING: {
         CLEANUP: `${API_BASE_URL}/papers/cleanup`,
-        FIND_DUPLICATES: `${API_BASE_URL}/papers/find-duplicates`,
+        FIND_DUPLICATES: `${API_BASE_URL}/processing/find-duplicates`,
         UPDATE_METADATA: (id) => `${API_BASE_URL}/papers/${id}/update-metadata`,
         RETRIEVE_PDF: (id) => `${API_BASE_URL}/papers/${id}/retrieve-pdf`,
         MARK_READY: (id) => `${API_BASE_URL}/papers/${id}/mark-ready`,
         PROJECT_PROCESSING: (projectId) => `${API_BASE_URL}/projects/${projectId}/processing`,
         COUNTS: `${API_BASE_URL}/papers/counts`,
+        FETCH_METADATA: (id) => `${API_BASE_URL}/processing/papers/${id}/fetch-metadata`,
     },
     CODING: {
         SHEETS: {
@@ -58,6 +61,8 @@ export const API_ROUTES = {
     RESULTS: {
         GENERATE: `${API_BASE_URL}/results/generate`,
         GET_BY_ID: (id) => `${API_BASE_URL}/results/${id}`,
+        TABLE: `${API_BASE_URL}/results/table`,
+        EXPORT: `${API_BASE_URL}/results/export`,
     }
 };
 

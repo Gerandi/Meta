@@ -36,6 +36,14 @@ export const processingService = {
   async findProjectDuplicates(projectId) {
     const response = await fetch(`${API_ROUTES.PROCESSING.FIND_DUPLICATES}?project_id=${projectId}`);
     return handleResponse(response);
+  },
+  
+  // Fetch metadata for a paper using its DOI or title/author
+  async fetchMetadataForPaper(paperId) {
+    const response = await fetch(API_ROUTES.PROCESSING.FETCH_METADATA(paperId), {
+      method: 'POST',
+    });
+    return handleResponse(response);
   }
 };
 
@@ -209,6 +217,15 @@ export const paperService = {
   async deletePaper(paperId) {
     const response = await fetch(API_ROUTES.PAPERS.DELETE(paperId), {
       method: 'DELETE',
+    });
+    return handleResponse(response);
+  },
+  
+  async batchDeletePapers(paperIds) {
+    const response = await fetch(API_ROUTES.PAPERS.BATCH_DELETE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(paperIds), // This should be a list of paper IDs
     });
     return handleResponse(response);
   },

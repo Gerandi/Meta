@@ -1,18 +1,4 @@
-    getFieldOptionsCount(options) {
-      if (!options) return 0;
-      
-      // If options is a string, count the lines
-      if (typeof options === 'string') {
-        return options.split('\n').filter(option => option.trim()).length;
-      }
-      
-      // If options is an array, return its length
-      if (Array.isArray(options)) {
-        return options.length;
-      }
-      
-      return 0;
-    },<template>
+<template>
   <div class="p-6 bg-gray-100 min-h-screen">
     <!-- Header with back button, title, and save/duplicate buttons -->
     <div class="flex items-center mb-6">
@@ -39,7 +25,25 @@
     </div>
     
     <!-- Sections -->
-    <div v-for="(sectionData, sectionIndex) in sectionsArray" :key="sectionIndex" class="bg-white rounded-lg shadow p-6 mb-6">
+    <!-- No coding sheet exists message -->
+    <div v-if="noSheetExists" class="bg-white rounded-lg shadow p-6 mb-6 text-center">
+      <div class="mb-4">
+        <div class="inline-flex items-center justify-center h-16 w-16 rounded-full bg-indigo-100 text-indigo-600 mb-6 mx-auto">
+          <File class="w-8 h-8" />
+        </div>
+        <h2 class="text-xl font-medium mb-2">No Coding Sheet Found</h2>
+        <p class="text-gray-600 mb-6">There is no coding sheet configured for this project yet. Create a default coding sheet to get started with coding your papers.</p>
+        <button 
+          class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 inline-flex items-center"
+          @click="createDefaultCodingSheet"
+        >
+          <Plus class="mr-1" size="18" /> Create Default Coding Sheet
+        </button>
+      </div>
+    </div>
+    
+    <!-- Display sections if coding sheet exists -->
+    <div v-else v-for="(sectionData, sectionIndex) in sectionsArray" :key="sectionIndex" class="bg-white rounded-lg shadow p-6 mb-6">
       <div class="flex justify-between items-center mb-4">
         <div>
           <h2 class="text-lg font-medium flex items-center">
@@ -103,14 +107,14 @@
       </button>
     </div>
     
-    <!-- Add new section button -->
-    <button class="flex items-center text-indigo-600 hover:text-indigo-800 mb-6"
+    <!-- Add new section button (only if sheet exists) -->
+    <button v-if="!noSheetExists" class="flex items-center text-indigo-600 hover:text-indigo-800 mb-6"
       @click="addSection">
       <PlusCircle class="mr-1" size="16" /> Add New Section
     </button>
     
-    <!-- Save and Cancel Buttons -->
-    <div class="flex justify-end mt-6">
+    <!-- Save and Cancel Buttons (only if sheet exists or being created) -->
+    <div v-if="!noSheetExists" class="flex justify-end mt-6">
       <button class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 mr-2"
         @click="goBack">
         Cancel
@@ -157,7 +161,9 @@ import {
   HelpCircle, 
   Edit, 
   Trash2, 
-  PlusCircle
+  PlusCircle,
+  File,
+  Plus
 } from 'lucide-vue-next';
 
 export default {
@@ -173,6 +179,8 @@ export default {
     Edit, 
     Trash2, 
     PlusCircle,
+    File,
+    Plus,
     FieldEditModal,
     SectionSettingsModal
   },
@@ -190,6 +198,7 @@ export default {
       originalSections: null, // To track changes
       hasUnsavedChanges: false,
       sectionsArray: [], // Array of sections with fields
+      noSheetExists: false, // Flag for when no coding sheet exists
       
       // Field edit modal
       showFieldModal: false,
@@ -234,7 +243,30 @@ export default {
     }
   },
   methods: {
+    getFieldOptionsCount(options) {
+      if (!options) return 0;
+      
+      // If options is a string, count the lines
+      if (typeof options === 'string') {
+        return options.split('\n').filter(option => option.trim()).length;
+      }
+      
+      // If options is an array, return its length
+      if (Array.isArray(options)) {
+        return options.length;
+      }
+      
+      return 0;
+    },
+    
     async loadProjectData() {
+      // Add check for projectId
+      if (!this.projectId) {
+        console.error("CodingSheet: projectId is missing.");
+        this.$emit('back-to-project');
+        return;
+      }
+      
       try {
         // Fetch project details
         const projectResponse = await fetch(API_ROUTES.PROJECTS.GET_BY_ID(this.projectId));
@@ -266,10 +298,10 @@ export default {
             this.setDefaultSections();
           }
         } catch (error) {
-          // If 404 Not Found, create a default coding sheet
+          // If 404 Not Found, set flag and don't auto-create default coding sheet
           if (error.message && error.message.includes('404')) {
-            console.log('No coding sheet found for this project yet. Using default template.');
-            this.setDefaultSections();
+            console.log('No coding sheet found for this project yet.');
+            this.noSheetExists = true;
           } else {
             console.error('Error checking for existing coding sheet:', error);
             this.setDefaultSections();
@@ -279,6 +311,13 @@ export default {
         console.error('Error loading project data:', error);
         alert('There was a problem loading the project data. Please try again.');
       }
+    },
+    
+    createDefaultCodingSheet() {
+      // Set default sections and clear the "no sheet exists" flag
+      this.setDefaultSections();
+      this.noSheetExists = false;
+      this.hasUnsavedChanges = true;
     },
     
     setDefaultSections() {
