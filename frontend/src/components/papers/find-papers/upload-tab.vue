@@ -86,6 +86,7 @@
 import UploadItem from './upload-item.vue';
 import { UploadCloud } from 'lucide-vue-next';
 import { API_ROUTES } from '../../../config.js';
+import { useAuthStore } from '../../../stores/auth'; // Import auth store
 
 export default {
   name: 'UploadTab',
@@ -154,10 +155,16 @@ export default {
     },
     
     async fetchProjects() {
+      const authStore = useAuthStore(); // Get auth store instance
       try {
-        const response = await fetch(API_ROUTES.PROJECTS.LIST);
+        // Add Authorization header
+        const headers = { 'Authorization': `Bearer ${authStore.token}` };
+        const response = await fetch(API_ROUTES.PROJECTS.LIST, { headers });
         if (response.ok) {
           this.projects = await response.json();
+        } else if (response.status === 401) {
+          console.error('Unauthorized fetching projects in UploadTab');
+          // Optionally handle logout or error display
         }
       } catch (error) {
         console.error('Error fetching projects:', error);
@@ -222,6 +229,13 @@ export default {
               });
               
               xhr.open('POST', uploadUrl);
+              
+              // Add Authorization header for XHR
+              const authStore = useAuthStore();
+              if (authStore.isAuthenticated && authStore.token) {
+                xhr.setRequestHeader('Authorization', `Bearer ${authStore.token}`);
+              }
+              
               xhr.send(formData);
             });
             

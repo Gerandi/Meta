@@ -839,6 +839,8 @@
 <script>
 import { API_ROUTES } from '../config.js';
 import { paperService, processingService } from '../services/api.js';
+import { useProjectStore } from '../stores/project'; // Import project store
+import { mapState } from 'pinia'; // Import mapState
 import { 
   Filter, 
   CheckCircle, 
@@ -914,18 +916,11 @@ export default {
       `
     }
   },
+  // Removed activeProject prop
   props: {
     selectedPapers: {
       type: Array,
       default: () => []
-    },
-    activeProject: {
-      type: Object,
-      required: true,
-      validator: (project) => {
-        // Validate that the project has an id
-        return project && project.id;
-      }
     }
   },
   data() {
@@ -988,6 +983,7 @@ export default {
     }
   },
   computed: {
+    ...mapState(useProjectStore, ['activeProject', 'hasActiveProject']), // Map project store state
     allSelected() {
       return this.papers.length > 0 && this.localSelectedPapers.length === this.papers.length;
     }
@@ -1002,18 +998,20 @@ export default {
         }
       }
     },
+    // Watch the activeProject from the store
     activeProject: {
       immediate: true,
       handler(newProject, oldProject) {
         // When the active project changes, refresh the data
-        if (newProject && newProject.id) {
-          if (!oldProject || newProject.id !== oldProject.id) {
+        if (this.hasActiveProject) { // Use the getter from the store
+          // Only fetch if the project ID actually changed or if it's the initial load with a valid project
+          if (!oldProject || newProject.id !== oldProject.id) { 
             console.log(`Active project changed to ${newProject.name} (${newProject.id}), refreshing data...`);
             this.fetchPapers();
             this.fetchPaperCounts();
           }
         } else {
-          console.warn('Active project is undefined or missing ID');
+          console.warn('PaperProcessing: Active project is undefined or missing ID in store');
           this.papers = [];
           this.totalPapers = 0;
           this.error = "No active project selected. Please select a project first.";
@@ -1022,6 +1020,7 @@ export default {
     }
   },
   mounted() {
+    // Initial fetch relies on the watcher triggering
     this.fetchPapers();
     this.fetchPaperCounts();
   },
@@ -1031,14 +1030,17 @@ export default {
       this.error = null;
       
       try {
-        if (!this.activeProject || !this.activeProject.id) {
-          this.papers = []; // Clear papers if no active project
+        // Guard: Check if there's an active project in the store
+        if (!this.hasActiveProject) {
+          this.papers = [];
           this.totalPapers = 0;
           this.totalPages = 1;
-          console.warn("PaperProcessing: No active project ID available.");
           this.error = "No active project selected. Please select a project first.";
-          return; // Exit if no active project
+          this.isLoading = false; // Reset loading state
+          return;
         }
+        
+        const projectId = this.activeProject.id; // Use project ID from store
 
         // Build filters object
         const filters = {};
@@ -1056,11 +1058,11 @@ export default {
         }
         
         // Log the active project being used
-        console.log(`Fetching papers for project ${this.activeProject.id} (${this.activeProject.name})`);
+        console.log(`Fetching papers for project ${projectId} (${this.activeProject.name})`);
         
-        // Use the processing service with active project ID
+        // Use the processing service with project ID from store
         const data = await processingService.getPapersForProcessing(
-          this.activeProject.id,
+          projectId,
           (this.currentPage - 1) * this.itemsPerPage,
           this.itemsPerPage,
           filters
@@ -1084,8 +1086,8 @@ export default {
     
     async fetchPaperCounts() {
       try {
-        if (!this.activeProject || !this.activeProject.id) {
-          // Reset counts if no active project
+        // Guard: Check if there's an active project in the store
+        if (!this.hasActiveProject) {
           this.totalPapers = 0;
           this.duplicateCount = 0;
           this.incompleteCount = 0;
@@ -1095,8 +1097,10 @@ export default {
           return;
         }
         
+        const projectId = this.activeProject.id; // Use project ID from store
+        
         // Fetch total counts with project ID as query parameter
-        const response = await fetch(`${API_ROUTES.PROCESSING.COUNTS}?project_id=${this.activeProject.id}`);
+        const response = await fetch(`${API_ROUTES.PROCESSING.COUNTS}?project_id=${projectId}`);
         
         if (response.ok) {
           const data = await response.json();
@@ -1119,15 +1123,19 @@ export default {
       this.error = null;
       
       try {
-        if (!this.activeProject || !this.activeProject.id) {
-          alert('Please select an active project first.');
+        // Guard: Check if there's an active project in the store
+        if (!this.hasActiveProject) {
+          this.error = "No active project selected. Please select a project first.";
+          this.isLoading = false;
           return;
         }
         
-        console.log(`Finding duplicates for project ${this.activeProject.id}`);
+        const projectId = this.activeProject.id; // Use project ID from store
         
-        // Use the processing service with project ID
-        const data = await processingService.findProjectDuplicates(this.activeProject.id);
+        console.log(`Finding duplicates for project ${projectId}`);
+        
+        // Use the processing service with project ID from store
+        const data = await processingService.findProjectDuplicates(projectId);
         
         console.log(`Duplicate detection complete. Found ${data.length} potential duplicate groups`);
         
@@ -1156,10 +1164,13 @@ export default {
     async retrieveAllMissingPDFs() {
       if (this.isRetrieving) return;
       
-      if (!this.activeProject || !this.activeProject.id) {
-        alert('Please select an active project first.');
+      // Guard: Check if there's an active project in the store
+      if (!this.hasActiveProject) {
+        this.error = "No active project selected. Please select a project first.";
         return;
       }
+      
+      const projectId = this.activeProject.id; // Use project ID from store
       
       this.isRetrieving = true;
       
@@ -1170,9 +1181,9 @@ export default {
           limit: 100 // Retrieve up to 100 papers to process
         };
         
-        // Use the processing service
+        // Use the processing service with project ID from store
         const papers = await processingService.getPapersForProcessing(
-          this.activeProject.id,
+          projectId,
           0, // Start from the first paper
           100, // Get up to 100 papers
           filters
@@ -1780,9 +1791,17 @@ export default {
         return;
       }
       
-      // Emit event to parent to change view, passing the active project
-      this.$emit('change-view', 'coding', this.activeProject.id);
-      console.log(`Navigating to coding view for project ${this.activeProject.id}`);
+      // Guard: Check if there's an active project in the store
+      if (!this.hasActiveProject) {
+        alert("No active project selected.");
+        return;
+      }
+      
+      const projectId = this.activeProject.id; // Use project ID from store
+      
+      // Emit event to parent to change view, passing the active project ID
+      this.$emit('change-view', 'coding', projectId);
+      console.log(`Navigating to coding view for project ${projectId}`);
     },
     
     toggleFilters() {

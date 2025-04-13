@@ -829,7 +829,7 @@ export default {
           if (result.imported_papers && result.imported_papers[0] && result.imported_papers[0].id) {
             this.importedPaperIds.add(result.imported_papers[0].id);
           }
-          // Refresh the imported papers list
+          // Refresh the imported papers list in the section below
           this.$refs.importedPapersSection?.fetchImportedPapers();
         } else {
           alert(`Failed to import paper: ${result.errors?.[0]?.error || 'Unknown error'}`);

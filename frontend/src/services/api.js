@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/auth'; // Import auth store
 // Helper to get headers with auth token
 function getAuthHeaders() {
   const authStore = useAuthStore();
+  console.log('getAuthHeaders - Token:', authStore.token); // Added for debugging
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

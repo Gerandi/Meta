@@ -264,7 +264,8 @@ export default {
         this.closeModal();
       } catch (err) {
         console.error('Error saving project:', err);
-        alert('Error: ' + err.message);
+        this.error = err.message || 'Failed to save project.'; // Set error property
+        alert('Error: ' + this.error); // Keep alert for immediate feedback
       }
     },
     
@@ -288,7 +289,8 @@ export default {
         this.$emit('project-list-changed');
       } catch (err) {
         console.error('Error deleting project:', err);
-        alert('Error: ' + err.message);
+        this.error = err.message || 'Failed to delete project.'; // Set error property
+        alert('Error: ' + this.error); // Keep alert for immediate feedback
       }
     }
   }

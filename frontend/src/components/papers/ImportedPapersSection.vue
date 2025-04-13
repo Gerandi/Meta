@@ -314,8 +314,20 @@ export default {
       try {
         console.log(`Adding ${paperIds.length} papers to project ${projectId}`);
         
-        // Use the service to add papers to project
-        const result = await projectService.addPapersToProject(projectId, paperIds);
+        // Ensure paperIds is an array of numbers before calling the service
+        const numericPaperIds = paperIds.map(id => Number(id)).filter(id => !isNaN(id));
+        if (numericPaperIds.length !== paperIds.length) {
+            console.warn("Some paper IDs were invalid during conversion.");
+        }
+        if (numericPaperIds.length === 0) {
+            alert("No valid paper IDs to add.");
+            return;
+        }
+        
+        console.log('Calling projectService.addPapersToProject with:', projectId, numericPaperIds); // Add logging here
+
+        // Use the service to add papers to project with numeric IDs
+        const result = await projectService.addPapersToProject(projectId, numericPaperIds);
         console.log('Project batch API result:', result);
         
         // If papers were added successfully, notify the user
