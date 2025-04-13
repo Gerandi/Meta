@@ -468,6 +468,7 @@ import {
   AlertTriangle,
   X
 } from 'lucide-vue-next';
+import { paperService } from '../services/api.js';
 
 export default {
   name: 'ImportPapers',
@@ -524,14 +525,8 @@ export default {
     },
     async fetchImportedPapers() {
       try {
-        const response = await fetch(API_ROUTES.PAPERS.LIST);
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || `Failed to fetch imported papers: ${response.status}`);
-        }
-        
-        this.importedPapers = await response.json();
+        // Use paperService instead of direct fetch
+        this.importedPapers = await paperService.listImportedPapers();
         console.log(`Fetched ${this.importedPapers.length} imported papers`);
       } catch (error) {
         console.error('Error fetching imported papers:', error);
@@ -615,48 +610,29 @@ export default {
           formData.append('project_id', this.activeProject.id);
         }
         
-        const xhr = new XMLHttpRequest();
-        
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = Math.round((event.loaded / event.total) * 100);
+        // Use the paperService for upload with progress tracking
+        paperService.uploadPaper(formData, (percentComplete) => {
+          // Update progress in the UI
+          this.$set(this.uploadingFiles, index, {
+            ...this.uploadingFiles[index],
+            progress: percentComplete
+          });
+        }).then(response => {
+          // Return the file ID or other identifier
+          const fileId = response.file_id || response.filename || file.name;
+          
+          // Store project association in metadata if available
+          if (this.activeProject && this.activeProject.id) {
             this.$set(this.uploadingFiles, index, {
               ...this.uploadingFiles[index],
-              progress: percentComplete
+              project_id: this.activeProject.id
             });
           }
+          
+          resolve(fileId);
+        }).catch(error => {
+          reject(error);
         });
-        
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const response = JSON.parse(xhr.responseText);
-              // Return the file ID or other identifier
-              const fileId = response.file_id || response.filename || file.name;
-              
-              // Store project association in metadata if available
-              if (this.activeProject && this.activeProject.id) {
-                this.$set(this.uploadingFiles, index, {
-                  ...this.uploadingFiles[index],
-                  project_id: this.activeProject.id
-                });
-              }
-              
-              resolve(fileId);
-            } catch (e) {
-              resolve(file.name); // Fallback if can't parse response
-            }
-          } else {
-            reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
-          }
-        });
-        
-        xhr.addEventListener('error', () => {
-          reject(new Error('Network error during upload'));
-        });
-        
-        xhr.open('POST', API_ROUTES.PAPERS.UPLOAD);
-        xhr.send(formData);
       });
     },
     async extractMetadata() {
@@ -724,21 +700,8 @@ export default {
     },
     async importPapers(papers) {
       try {
-        // Call the API to import papers
-        const response = await fetch(API_ROUTES.PAPERS.IMPORT_BATCH, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ papers })
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || 'Failed to import papers');
-        }
-        
-        const result = await response.json();
+        // Use paperService instead of direct fetch
+        const result = await paperService.importPapersBatch(papers);
         console.log('Import result:', result);
         
         if (result.imported_count > 0) {
@@ -844,19 +807,8 @@ export default {
           abstract: this.editingPaper.abstract || null
         };
         
-        // Call API to update the paper
-        const response = await fetch(API_ROUTES.PAPERS.GET_BY_ID(paperId), {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(updatedPaper)
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || 'Failed to update paper');
-        }
+        // Use paperService instead of direct fetch
+        await paperService.updatePaper(paperId, updatedPaper);
         
         // Close modal and refresh list
         this.showEditModal = false;
@@ -871,15 +823,8 @@ export default {
     async removePaper(paperId) {
       if (confirm('Are you sure you want to remove this paper?')) {
         try {
-          // Call API to delete the paper
-          const response = await fetch(API_ROUTES.PAPERS.GET_BY_ID(paperId), {
-            method: 'DELETE'
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || 'Failed to delete paper');
-          }
+          // Use paperService instead of direct fetch
+          await paperService.deletePaper(paperId);
           
           // Update the local list
           this.importedPapers = this.importedPapers.filter(paper => paper.id !== paperId);
@@ -897,14 +842,8 @@ export default {
       
       if (confirm(`Are you sure you want to remove ${this.selectedPaperIds.length} selected papers?`)) {
         try {
-          // Delete each selected paper
-          const deletePromises = this.selectedPaperIds.map(paperId => {
-            return fetch(API_ROUTES.PAPERS.GET_BY_ID(paperId), {
-              method: 'DELETE'
-            });
-          });
-          
-          await Promise.all(deletePromises);
+          // Use paperService batch delete instead of multiple API calls
+          await paperService.batchDeletePapers(this.selectedPaperIds);
           
           // Update the local list
           this.importedPapers = this.importedPapers.filter(paper => !this.selectedPaperIds.includes(paper.id));

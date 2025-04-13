@@ -230,6 +230,7 @@
 <script>
 import { API_ROUTES } from '../config.js';
 import { Save } from 'lucide-vue-next';
+import { codingService } from '../services/api.js';
 
 export default {
   name: 'CodingForm',
@@ -281,20 +282,12 @@ export default {
       if (!this.projectId) return;
       
       try {
-        const response = await fetch(API_ROUTES.CODING.SHEETS.GET_BY_PROJECT_ID(this.projectId));
+        // Use codingService instead of direct fetch
+        this.codingSheet = await codingService.getCodingSheetByProject(this.projectId);
+        console.log('Loaded coding sheet:', this.codingSheet);
         
-        if (response.ok) {
-          this.codingSheet = await response.json();
-          console.log('Loaded coding sheet:', this.codingSheet);
-          
-          // Initialize coding data object with fields from the coding sheet
-          this.initializeCodingData();
-        } else {
-          console.warn('No coding sheet found for this project. Using default form.');
-          // Use default form
-          this.codingData = { ...this.defaultCodingData };
-          this.prefillForm();
-        }
+        // Initialize coding data object with fields from the coding sheet
+        this.initializeCodingData();
       } catch (err) {
         console.error('Error loading coding sheet:', err);
         // Use default form on error
@@ -307,21 +300,18 @@ export default {
       if (!this.paper.id) return;
       
       try {
-        const response = await fetch(API_ROUTES.CODING.DATA.GET_BY_PAPER_ID(this.paper.id));
+        // Use codingService instead of direct fetch
+        this.savedCoding = await codingService.getCodingData(this.paper.id, this.codingSheet?.id);
+        console.log('Loaded existing coding:', this.savedCoding);
         
-        if (response.ok) {
-          this.savedCoding = await response.json();
-          console.log('Loaded existing coding:', this.savedCoding);
-          
-          // Merge existing coding data with our coding data object
-          if (this.savedCoding.data) {
-            this.codingData = { ...this.codingData, ...this.savedCoding.data };
-          }
-        } else {
-          console.log('No existing coding found for this paper.');
+        // Merge existing coding data with our coding data object
+        if (this.savedCoding.data) {
+          this.codingData = { ...this.codingData, ...this.savedCoding.data };
         }
       } catch (err) {
         console.error('Error loading existing coding:', err);
+        // If no coding exists, that's okay - we'll create a new one
+        console.log('No existing coding found for this paper.');
       }
     },
     
@@ -442,31 +432,14 @@ export default {
           data: this.codingData
         };
         
-        // If we already have saved coding, update it
-        let url = API_ROUTES.CODING.DATA.CREATE;
-        let method = 'POST';
-        
         if (this.savedCoding && this.savedCoding.id) {
-          url = `${API_ROUTES.CODING.DATA.UPDATE(this.savedCoding.id)}`;
-          method = 'PUT';
+          // Use codingService for update
           payload.id = this.savedCoding.id;
+          this.savedCoding = await codingService.updateCodingData(this.savedCoding.id, payload);
+        } else {
+          // Use codingService for create
+          this.savedCoding = await codingService.createCodingData(payload);
         }
-        
-        const response = await fetch(url, {
-          method: method,
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || 'Failed to save coding data');
-        }
-        
-        const savedData = await response.json();
-        this.savedCoding = savedData;
         
         // Show success message
         alert('Coding data saved successfully!');

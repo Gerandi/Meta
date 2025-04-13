@@ -172,6 +172,7 @@
 <script>
 import { API_ROUTES } from '../config.js';
 import { ArrowLeft, ClipboardList, Edit, FileText, Download, X } from 'lucide-vue-next';
+import { projectService, paperService } from '../services/api.js';
 
 export default {
   name: 'ProjectDetail',
@@ -219,14 +220,8 @@ export default {
       this.error = null;
       
       try {
-        const response = await fetch(API_ROUTES.PROJECTS.GET_BY_ID(this.projectId));
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to load project');
-        }
-        
-        this.project = await response.json();
+        // Use projectService instead of direct fetch
+        this.project = await projectService.getProject(this.projectId);
         this.editForm.name = this.project.name;
         this.editForm.description = this.project.description || '';
       } catch (err) {
@@ -242,14 +237,8 @@ export default {
       this.error = null;
       
       try {
-        const response = await fetch(API_ROUTES.PROJECTS.GET_PAPERS(this.projectId));
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to load papers');
-        }
-        
-        this.papers = await response.json();
+        // Use projectService instead of direct fetch
+        this.papers = await projectService.getProjectPapers(this.projectId);
       } catch (err) {
         this.error = err.message;
         console.error('Error fetching papers:', err);
@@ -298,14 +287,8 @@ export default {
     
     async removePaper() {
       try {
-        const response = await fetch(API_ROUTES.PROJECTS.REMOVE_PAPER(this.projectId, this.paperToRemove.id), {
-          method: 'DELETE'
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to remove paper from project');
-        }
+        // Use projectService instead of direct fetch
+        await projectService.removePaperFromProject(this.projectId, this.paperToRemove.id);
         
         // Remove paper from the list
         this.papers = this.papers.filter(p => p.id !== this.paperToRemove.id);
@@ -321,18 +304,8 @@ export default {
     
     async updateProject() {
       try {
-        const response = await fetch(API_ROUTES.PROJECTS.UPDATE(this.projectId), {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(this.editForm)
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to update project');
-        }
+        // Use projectService instead of direct fetch
+        await projectService.updateProject(this.projectId, this.editForm);
         
         // Update local project data
         this.project.name = this.editForm.name;
