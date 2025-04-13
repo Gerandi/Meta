@@ -8,6 +8,8 @@ import json
 import PyPDF2
 from io import BytesIO
 
+from app.models.paper import PaperStatus
+
 from app.services.openalex_direct import get_paper_by_doi_direct, search_papers_direct
 
 logger = logging.getLogger(__name__)
@@ -293,6 +295,9 @@ async def process_pdf_file(file_content: bytes, filename: str, project_id: Optio
     
     if file_path:
         metadata["file_path"] = file_path
+    
+    # Set initial status to IMPORTED
+    metadata["status"] = PaperStatus.IMPORTED
     
     # Enhance metadata with API lookup - added in the refactoring
     enhanced_metadata = await enhance_metadata_with_api(metadata)

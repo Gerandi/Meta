@@ -9,6 +9,7 @@ export const API_ROUTES = {
         GET_BY_ID: (id) => `${API_BASE_URL}/papers/${id}`,
         CREATE: `${API_BASE_URL}/papers`,
         LIST: `${API_BASE_URL}/papers`,
+        LIST_IMPORTED: `${API_BASE_URL}/papers/imported`,
         FIND_DOI: `${API_BASE_URL}/papers/find-doi`,
         BATCH_FIND_DOI: `${API_BASE_URL}/papers/batch-find-doi`,
         GET_PDF: (doi) => `${API_BASE_URL}/papers/pdf/${doi}`,

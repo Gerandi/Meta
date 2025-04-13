@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
+from app.models.paper import PaperStatus  # Import the enum
 
 
 class Author(BaseModel):
@@ -34,9 +35,12 @@ class PaperBase(BaseModel):
     citation_count: Optional[int] = Field(None, description="Number of citations according to OpenAlex")
     references_count: Optional[int] = Field(None, description="Number of references in the paper")
     source: Optional[str] = Field("OpenAlex", description="Data source for this paper record")
+    file_path: Optional[str] = Field(None, description="Path to the locally stored PDF file, if any")
+    status: PaperStatus = Field(PaperStatus.IMPORTED, description="Current status of the paper in the workflow")
 
 
 class PaperCreate(PaperBase):
+    status: Optional[PaperStatus] = Field(PaperStatus.IMPORTED, description="Current status of the paper in the workflow")
     class Config:
         schema_extra = {
             "example": {
@@ -75,6 +79,7 @@ class Paper(PaperBase):
     id: int = Field(..., description="Database ID for this paper")
     created_at: datetime = Field(..., description="Timestamp when this record was created")
     updated_at: datetime = Field(..., description="Timestamp when this record was last updated")
+    status: PaperStatus = Field(..., description="Current status of the paper in the workflow")
 
     class Config:
         from_attributes = True  # Updated from orm_mode

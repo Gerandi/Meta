@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import HTTPException
 from datetime import datetime
 
-from app.models.paper import Paper as PaperModel
+from app.models.paper import Paper as PaperModel, PaperStatus
 from app.schemas.paper import PaperCreate, Paper as PaperSchema
 from app.schemas.paper import Author as AuthorSchema
 
@@ -47,6 +47,9 @@ def create_paper(db: Session, paper: PaperCreate) -> PaperModel:
                 author_copy['name'] = 'Unknown Author'
                 formatted_authors.append(author_copy)
     
+    # Use provided status or default to IMPORTED
+    status = paper.status if paper.status else PaperStatus.IMPORTED
+    
     # Convert Pydantic model to SQLAlchemy model
     db_paper = PaperModel(
         title=paper.title,
@@ -62,7 +65,9 @@ def create_paper(db: Session, paper: PaperCreate) -> PaperModel:
         url=paper.url or (paper.doi if paper.doi else ""),
         keywords=paper.keywords,
         is_open_access=paper.is_open_access,
-        open_access_url=paper.open_access_url
+        open_access_url=paper.open_access_url,
+        file_path=paper.file_path,
+        status=status
     )
     
     # Add to database
@@ -107,8 +112,31 @@ def delete_paper(db: Session, paper_id: int) -> bool:
     return True
 
 
-def list_papers(db: Session, skip: int = 0, limit: int = 100) -> List[PaperModel]:
+def list_papers(db: Session, skip: int = 0, limit: int = 100, status: Optional[PaperStatus] = None, project_id: Optional[int] = None) -> List[PaperModel]:
     """
-    List all papers with pagination.
+    List papers with pagination and optional filters for status and project_id.
     """
-    return db.query(PaperModel).offset(skip).limit(limit).all()
+    query = db.query(PaperModel)
+    
+    # Apply status filter if provided
+    if status:
+        query = query.filter(PaperModel.status == status)
+    
+    # Apply project filter if provided
+    if project_id:
+        from app.models.project import paper_project
+        query = query.join(paper_project).filter(paper_project.c.project_id == project_id)
+    
+    return query.order_by(PaperModel.created_at.desc()).offset(skip).limit(limit).all()
+
+
+def list_imported_papers(db: Session, skip: int = 0, limit: int = 100) -> List[PaperModel]:
+    """
+    Get papers that have been imported but not yet added to a project.
+    """
+    return db.query(PaperModel)\
+            .filter(PaperModel.status == PaperStatus.IMPORTED)\
+            .order_by(PaperModel.created_at.desc())\
+            .offset(skip)\
+            .limit(limit)\
+            .all()

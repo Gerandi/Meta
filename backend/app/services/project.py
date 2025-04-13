@@ -6,7 +6,7 @@ from datetime import datetime
 import logging
 
 from app.models.project import Project as ProjectModel, paper_project
-from app.models.paper import Paper as PaperModel
+from app.models.paper import Paper as PaperModel, PaperStatus
 from app.schemas.project import ProjectCreate, ProjectUpdate
 
 logger = logging.getLogger(__name__)
@@ -129,6 +129,10 @@ def add_paper_to_project(db: Session, project_id: int, paper_id: int) -> Project
     if db_paper in db_project.papers:
         return db_project
     
+    # Update paper status to PROCESSING when added to project
+    if db_paper.status == PaperStatus.IMPORTED:
+        db_paper.status = PaperStatus.PROCESSING
+    
     db_project.papers.append(db_paper)
     db.commit()
     db.refresh(db_project)
@@ -187,6 +191,9 @@ def add_papers_to_project_batch(db: Session, project_id: int, paper_ids: List[in
     # Add papers that are not already in the project
     for paper in papers:
         if paper.id not in existing_paper_ids:
+            # Update paper status to PROCESSING when added to project
+            if paper.status == PaperStatus.IMPORTED:
+                paper.status = PaperStatus.PROCESSING
             db_project.papers.append(paper)
             added_count += 1
         else:

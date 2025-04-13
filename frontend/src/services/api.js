@@ -140,8 +140,22 @@ export const paperService = {
     return handleResponse(response);
   },
   
-  async listPapers(skip = 0, limit = 100) {
-    const response = await fetch(`${API_ROUTES.PAPERS.LIST}?skip=${skip}&limit=${limit}`);
+  async listPapers(skip = 0, limit = 100, filters = {}) {
+    const params = new URLSearchParams({ skip, limit });
+    
+    // Add any additional filters
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== '') {
+        params.append(key, value);
+      }
+    });
+    
+    const response = await fetch(`${API_ROUTES.PAPERS.LIST}?${params.toString()}`);
+    return handleResponse(response);
+  },
+  
+  async listImportedPapers(skip = 0, limit = 100) {
+    const response = await fetch(`${API_ROUTES.PAPERS.LIST_IMPORTED}?skip=${skip}&limit=${limit}`);
     return handleResponse(response);
   },
   

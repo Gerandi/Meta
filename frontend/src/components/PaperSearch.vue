@@ -188,6 +188,7 @@ import SearchTab from './papers/find-papers/search-tab.vue';
 import UploadTab from './papers/find-papers/upload-tab.vue';
 import ImportedPaperItem from './papers/find-papers/imported-paper-item.vue';
 import { API_ROUTES, APP_CONFIG } from '../config.js';
+import { paperService, projectService } from '../services/api.js';
 import { 
   Search, 
   Upload, 
@@ -749,14 +750,8 @@ export default {
     // Project management
     async fetchProjects() {
       try {
-        console.log('Fetching projects from:', API_ROUTES.PROJECTS.LIST);
-        const response = await fetch(API_ROUTES.PROJECTS.LIST);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch projects');
-        }
-        
-        this.projects = await response.json();
+        console.log('Fetching projects');
+        this.projects = await projectService.listProjects();
         console.log(`Fetched ${this.projects.length} projects`);
       } catch (error) {
         console.error('Error fetching projects:', error);
@@ -766,21 +761,10 @@ export default {
     
     async createProject() {
       try {
-        const response = await fetch(API_ROUTES.PROJECTS.CREATE, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(this.newProject)
-        });
+        // Create project using the service
+        const project = await projectService.createProject(this.newProject);
         
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || 'Failed to create project');
-        }
-        
-        // Handle successful project creation
-        const project = await response.json();
+        // Update local data
         this.projects.push(project);
         this.selectedProjectId = project.id;
         
@@ -805,29 +789,11 @@ export default {
         // Extract just the IDs from the papersToAddToProject array
         const paperIds = this.papersToAddToProject.map(paper => paper.id);
         
-        const response = await fetch(API_ROUTES.PROJECTS.ADD_PAPERS_BATCH(this.selectedProjectId), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ paper_ids: paperIds })
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || `Failed to add papers to project: ${response.status}`);
-        }
-        
-        // Handle successful project batch API response
-        const result = await response.json();
+        // Use the service to add papers to project
+        const result = await projectService.addPapersToProject(this.selectedProjectId, paperIds);
         console.log('Project batch API result:', result);
         
-        // If papers were added successfully, copy any associated files to the project directory
-        if (result.added_count > 0) {
-          // In a future implementation, we could add an API call here to move/copy PDF files 
-          // to the project directory if they're stored elsewhere
-        }
-        
+        // If papers were added successfully, notify the user
         alert(`${result.added_count || 0} paper(s) added to project successfully. ${result.skipped_count || 0} were already in the project.`);
         this.showProjectModal = false;
         this.papersToAddToProject = [];
@@ -921,26 +887,15 @@ export default {
             keywords: Array.isArray(paper.keywords) ? paper.keywords : [],
             is_open_access: paper.is_open_access || false,
             open_access_url: paper.open_access_url,
-            source: paper.source || 'Search Import'
+            source: paper.source || 'Search Import',
+            status: 'imported' // Explicitly set the status to 'imported'
           };
         });
         
         console.log('Formatted papers for import:', formattedPapers);
         
-        const response = await fetch(API_ROUTES.PAPERS.IMPORT_BATCH, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(formattedPapers)
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || 'Failed to import papers');
-        }
-        
-        const result = await response.json();
+        // Use the paper service to import papers
+        const result = await paperService.importPapersBatch(formattedPapers);
         console.log('Import result:', result);
         
         // Store the imported papers with their database IDs
@@ -971,15 +926,8 @@ export default {
     // Fetch imported papers
     async fetchImportedPapers() {
       try {
-        console.log('Fetching imported papers from:', API_ROUTES.PAPERS.LIST);
-        const response = await fetch(API_ROUTES.PAPERS.LIST);
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || `Failed to fetch imported papers: ${response.status}`);
-        }
-        
-        this.importedPapers = await response.json();
+        console.log('Fetching imported papers');
+        this.importedPapers = await paperService.listImportedPapers();
         console.log(`Fetched ${this.importedPapers.length} imported papers`);
       } catch (error) {
         console.error('Error fetching imported papers:', error);

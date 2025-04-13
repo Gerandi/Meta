@@ -14,7 +14,8 @@ from io import StringIO
 logger = logging.getLogger(__name__)
 
 from app.schemas.paper import Paper, PaperCreate
-from app.services.paper import create_paper, get_paper_by_id, update_paper, delete_paper, list_papers
+from app.services.paper import create_paper, get_paper_by_id, update_paper, delete_paper, list_papers, list_imported_papers
+from app.models.paper import PaperStatus
 from app.services.pdf_service import get_paper_pdf_url, get_paper_details
 from app.services.doi_service import get_doi_for_paper, get_dois_for_papers
 from app.services.openalex_direct import search_papers_direct
@@ -157,16 +158,30 @@ async def get_paper_content(
     return FileResponse(path=file_path, filename=filename, media_type='application/pdf')
 
 
-@router.get("/", response_model=List[Paper])
-async def get_papers(
+@router.get("/imported", response_model=List[Paper])
+async def get_imported_papers(
     skip: int = Query(0, description="Number of papers to skip"),
     limit: int = Query(100, description="Maximum number of papers to return"),
     db: Session = Depends(get_db),
 ):
     """
-    Get a list of papers with pagination.
+    Get papers that have been imported but not yet added to a project.
     """
-    return list_papers(db, skip, limit)
+    return list_imported_papers(db, skip, limit)
+
+
+@router.get("/", response_model=List[Paper])
+async def get_papers(
+    skip: int = Query(0, description="Number of papers to skip"),
+    limit: int = Query(100, description="Maximum number of papers to return"),
+    status: Optional[PaperStatus] = Query(None, description="Filter by paper status"),
+    project_id: Optional[int] = Query(None, description="Filter by project ID"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get a list of papers with pagination and optional filters.
+    """
+    return list_papers(db, skip, limit, status, project_id)
 
 
 @router.get("/pdf/{doi}", response_model=Dict[str, Any])
@@ -395,6 +410,9 @@ async def upload_pdf(
             paper_data["publication_date"] = datetime(metadata["year"], 1, 1).isoformat()
         elif metadata.get("publication_date"):
             paper_data["publication_date"] = metadata["publication_date"]
+            
+        # Set the status from metadata or default to IMPORTED
+        paper_data["status"] = metadata.get("status", PaperStatus.IMPORTED)
             
         # Create paper in database
         paper_create = PaperCreate(**paper_data)
