@@ -34,6 +34,7 @@ class CodingSheetBase(BaseModel):
     name: str
     description: Optional[str] = None
     sections: List[CodingSection]
+    project_id: Optional[int] = None
 
 
 class CodingSheetCreate(CodingSheetBase):

@@ -228,7 +228,5 @@ def get_coding_sheet_by_project_service(db: Session, project_id: int) -> Optiona
     Returns:
         CodingSheet object if found, None otherwise
     """
-    # For now, we're using a simple approach where we assume the coding sheet name
-    # contains the project ID or name. In a future implementation, we might want to
-    # add a project_id field to the CodingSheet model.
-    return db.query(CodingSheet).filter(CodingSheet.name.like(f"%Project {project_id}%")).first()
+    # Query directly by project_id foreign key
+    return db.query(CodingSheet).filter(CodingSheet.project_id == project_id).first()

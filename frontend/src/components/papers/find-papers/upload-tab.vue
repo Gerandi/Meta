@@ -34,6 +34,7 @@
           :key="index"
           :item="item"
           @remove="$emit('remove-from-queue', index)"
+          @view-paper="$emit('paper-imported', item.paper)"
         />
       </div>
       
@@ -171,8 +172,8 @@ export default {
         const item = this.uploadQueue[i];
         if (item.status === 'queued') {
           try {
-            // Update status to uploading
-            this.$set(this.uploadQueue, i, { ...item, status: 'uploading' });
+            // Update status to uploading - Using Vue 3 direct reactivity (no $set needed)
+            this.uploadQueue[i] = { ...item, status: 'uploading' };
             
             // Create form data
             const formData = new FormData();
@@ -183,7 +184,7 @@ export default {
               formData.append('project_id', this.selectedProjectId);
             }
             
-            // Directly upload to the simplified endpoint
+            // Upload using the backend endpoint directly
             const uploadUrl = API_ROUTES.PAPERS.UPLOAD;
             
             // Use XMLHttpRequest for progress tracking
@@ -193,7 +194,8 @@ export default {
               xhr.upload.addEventListener('progress', (event) => {
                 if (event.lengthComputable) {
                   const percentComplete = Math.round((event.loaded / event.total) * 100);
-                  this.$set(this.uploadQueue, i, { ...this.uploadQueue[i], progress: percentComplete });
+                  // Use Vue 3 direct reactivity (no $set needed)
+                  this.uploadQueue[i] = { ...this.uploadQueue[i], progress: percentComplete };
                 }
               });
               
@@ -201,13 +203,13 @@ export default {
                 if (xhr.status >= 200 && xhr.status < 300) {
                   try {
                     const response = JSON.parse(xhr.responseText);
-                    // Store paper data in item
-                    this.$set(this.uploadQueue, i, {
+                    // Store paper data in item - Use Vue 3 direct reactivity
+                    this.uploadQueue[i] = {
                       ...this.uploadQueue[i],
                       status: 'complete',
                       progress: 100,
                       paper: response
-                    });
+                    };
                     resolve(response);
                   } catch (e) {
                     reject(new Error('Invalid response format'));
@@ -230,11 +232,12 @@ export default {
             
           } catch (error) {
             console.error(`Error uploading ${item.name}:`, error);
-            this.$set(this.uploadQueue, i, {
+            // Use Vue 3 direct reactivity (no $set needed)
+            this.uploadQueue[i] = {
               ...this.uploadQueue[i],
               status: 'error',
               error: error.message
-            });
+            };
           }
         }
       }

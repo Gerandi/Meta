@@ -9,7 +9,7 @@ from app.models.paper import Paper as PaperModel
 
 router = APIRouter()
 
-@router.get("/papers/counts", response_model=Dict[str, Any])
+@router.get("/papers", response_model=Dict[str, Any])
 async def get_paper_counts(db: Session = Depends(get_db)):
     """
     Get counts of papers by category for dashboard metrics.

@@ -21,13 +21,13 @@
       <div class="flex border-b">
         <TabButton 
           label="Clean up Collection" 
-          :icon="'file-text'"
+          :icon="FileText"
           :active="activeTab === 'cleanup'" 
           @click="activeTab = 'cleanup'"
         />
         <TabButton 
           label="Retrieve Full Texts" 
-          :icon="'download'"
+          :icon="Download"
           :active="activeTab === 'retrieve'" 
           @click="activeTab = 'retrieve'"
         />
@@ -566,7 +566,7 @@
                 >
                   <div class="flex justify-between items-center mb-2">
                     <div class="font-medium flex items-center">
-                      <font-awesome-icon icon="file-pdf" class="text-gray-500 mr-2" />
+                      <FileText class="text-gray-500 mr-2" size="16" />
                       {{ file.name }}
                     </div>
                     <div class="text-sm text-gray-500">{{ formatFileSize(file.size) }}</div>
@@ -593,7 +593,7 @@
             </div>
             
             <div v-if="uploadedFiles.length > 0 && uploadedFiles.some(f => f.status === 'complete')" class="flex items-center border rounded-lg p-4 bg-indigo-50 text-indigo-800">
-              <font-awesome-icon icon="check-circle" class="mr-2" />
+              <CheckCircle class="mr-2" size="16" />
               <span>{{ uploadedFiles.filter(f => f.status === 'complete').length }} files uploaded successfully. Continue to match these files with your papers.</span>
               <button 
                 class="ml-auto px-4 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
@@ -616,14 +616,14 @@
                 class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center mr-2"
                 @click="autoMatchPdfs"
               >
-                <font-awesome-icon icon="rotate-right" class="mr-1" /> Auto-Match PDFs
+                <RefreshCw class="mr-1" size="16" /> Auto-Match PDFs
               </button>
             </div>
             
             <div v-for="(file, index) in uploadedFiles.filter(f => f.status === 'complete')" :key="index" class="border rounded-lg p-4" :class="file.matched ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'">
               <div class="flex items-start">
                 <div class="h-10 w-10 rounded-full bg-white border flex items-center justify-center mr-3">
-                  <font-awesome-icon icon="file-pdf" class="text-gray-500" />
+                  <FileText class="text-gray-500" size="16" />
                 </div>
                 
                 <div class="flex-1">
@@ -754,14 +754,20 @@
 
 <script>
 import { API_ROUTES } from '../config.js';
+import { FileText, Download, Filter, CheckCircle, HelpCircle, RefreshCw, RotateCw, 
+         AlertTriangle, Clock, Copy, Loader2, UploadCloud, Link, Search, X, 
+         Trash2, FolderOpen, Check } from 'lucide-vue-next';
 
 export default {
   name: 'PaperProcessing',
   components: {
+    FileText, Download, Filter, CheckCircle, HelpCircle, RefreshCw, RotateCw, 
+    AlertTriangle, Clock, Copy, Loader2, UploadCloud, Link, Search, X, 
+    Trash2, FolderOpen, Check,
     TabButton: {
       props: {
         label: String,
-        icon: String,
+        icon: Object,
         active: Boolean
       },
       template: `
@@ -774,7 +780,7 @@ export default {
           ]"
           @click="$emit('click')"
         >
-          <span class="mr-2"><font-awesome-icon :icon="icon" /></span>
+          <component :is="icon" class="mr-2" size="16" />
           {{ label }}
         </button>
       `

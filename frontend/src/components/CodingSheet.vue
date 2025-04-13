@@ -521,7 +521,7 @@ export default {
         const codingSheet = {
           name: `${this.projectName} Coding Sheet`,
           description: `Coding sheet for project: ${this.projectName}`,
-          projectId: this.projectId,
+          project_id: this.projectId,
           sections: this.sectionsArray
         };
         

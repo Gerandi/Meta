@@ -28,24 +28,28 @@ export const API_ROUTES = {
         GET_PAPERS: (projectId) => `${API_BASE_URL}/projects/${projectId}/papers/`,
     },
     PROCESSING: {
-        CLEANUP: `${API_BASE_URL}/papers/cleanup`,
-        FIND_DUPLICATES: `${API_BASE_URL}/papers/find-duplicates`,
-        UPDATE_METADATA: (id) => `${API_BASE_URL}/papers/${id}/update-metadata`,
-        RETRIEVE_PDF: (id) => `${API_BASE_URL}/papers/${id}/retrieve-pdf`,
-        COUNTS: `${API_BASE_URL}/papers/counts`,
+        CLEANUP: `${API_BASE_URL}/processing/papers/cleanup`,
+        FIND_DUPLICATES: `${API_BASE_URL}/processing/papers/find-duplicates`,
+        UPDATE_METADATA: (id) => `${API_BASE_URL}/processing/papers/${id}/update-metadata`,
+        RETRIEVE_PDF: (id) => `${API_BASE_URL}/processing/papers/${id}/retrieve-pdf`,
+    },
+    COUNTS: {
+        PAPERS: `${API_BASE_URL}/counts/papers`,
     },
     CODING: {
-        CREATE: `${API_BASE_URL}/coding`,
-        GET_BY_ID: (id) => `${API_BASE_URL}/coding/${id}`,
-        UPDATE: (id) => `${API_BASE_URL}/coding/${id}`,
-        DELETE: (id) => `${API_BASE_URL}/coding/${id}`,
-        GET_BY_PROJECT_ID: (projectId) => `${API_BASE_URL}/coding/project/${projectId}`,
-        GET_FOR_PAPER: (paperId) => `${API_BASE_URL}/coding/paper/${paperId}`,
-        SAVE_PAPER_CODING: `${API_BASE_URL}/coding/paper`,
+        CREATE: `${API_BASE_URL}/coding/sheets`,
+        LIST: `${API_BASE_URL}/coding/sheets`,
+        GET_BY_ID: (id) => `${API_BASE_URL}/coding/sheets/${id}`,
+        UPDATE: (id) => `${API_BASE_URL}/coding/sheets/${id}`,
+        DELETE: (id) => `${API_BASE_URL}/coding/sheets/${id}`,
+        GET_BY_PROJECT_ID: (projectId) => `${API_BASE_URL}/coding/sheets/project/${projectId}`,
+        GET_FOR_PAPER: (paperId) => `${API_BASE_URL}/coding/data/${paperId}`,
+        SAVE_PAPER_CODING: `${API_BASE_URL}/coding/data`,
+        UPDATE_CODING_DATA: (id) => `${API_BASE_URL}/coding/data/${id}`,
     },
     RESULTS: {
-        GENERATE: `${API_BASE_URL}/results/generate`,
-        GET_BY_ID: (id) => `${API_BASE_URL}/results/${id}`,
+        TABLE: `${API_BASE_URL}/results/table`,
+        EXPORT: `${API_BASE_URL}/results/export`,
     }
 };
 
