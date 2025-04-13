@@ -96,6 +96,8 @@
 <script>
 import SidebarItem from './SidebarItem.vue';
 import { API_ROUTES } from '../config.js';
+import { useProjectStore } from '../stores/project';
+import { mapState, mapActions } from 'pinia';
 
 export default {
   name: 'Sidebar',
@@ -106,18 +108,15 @@ export default {
     activeView: {
       type: String,
       required: true
-    },
-    activeProject: {
-      type: Object,
-      default: null
     }
+    // activeProject prop removed - now using Pinia store
+  },
+  computed: {
+    ...mapState(useProjectStore, ['activeProject', 'hasActiveProject', 'projects', 'isLoading', 'error'])
   },
   data() {
     return {
-      projects: [],
       selectedProjectId: null,
-      isLoading: false,
-      error: null,
       previousSelectedId: null // To store previous selection
     }
   },
@@ -152,6 +151,7 @@ export default {
     this.fetchProjects();
   },
   methods: {
+    ...mapActions(useProjectStore, ['setActiveProject', 'clearActiveProject', 'fetchProjects']),
     changeView(view) {
       // If no active project and trying to access a protected view, show project selector
       const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'resultsTable'];
@@ -162,20 +162,7 @@ export default {
       this.$emit('change-view', view);
     },
 
-    async fetchProjects() {
-      this.isLoading = true;
-      this.error = null;
-      try {
-        const response = await fetch(API_ROUTES.PROJECTS.LIST);
-        if (!response.ok) throw new Error('Failed to load projects');
-        this.projects = await response.json();
-      } catch (err) {
-        this.error = err.message;
-        console.error('Error fetching projects for sidebar:', err);
-      } finally {
-        this.isLoading = false;
-      }
-    },
+    // fetchProjects now comes from Pinia store
 
     handleProjectChange() {
       if (this.selectedProjectId === 'manage') {
@@ -184,7 +171,7 @@ export default {
       
       const selectedProject = this.projects.find(p => p.id === this.selectedProjectId);
       if (selectedProject) {
-        this.$emit('set-active-project', selectedProject);
+        this.setActiveProject(selectedProject);
       }
     },
 

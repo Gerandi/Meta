@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import { createPinia } from 'pinia' // Import Pinia
 import App from './App.vue'
 import './style.css'
 
@@ -49,6 +50,10 @@ import {
 
 // Create Vue app
 const app = createApp(App)
+
+// Initialize Pinia
+const pinia = createPinia()
+app.use(pinia)
 
 // Register Lucide icons globally
 app.component('Search', Search)

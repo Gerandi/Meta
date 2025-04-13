@@ -169,14 +169,13 @@ import {
   X, 
   Plus 
 } from 'lucide-vue-next';
+import { useProjectStore } from '../stores/project';
+import { mapState } from 'pinia';
 
 export default {
   name: 'PaperSearch',
-  props: {
-    activeProject: {
-      type: Object,
-      default: null
-    }
+  computed: {
+    ...mapState(useProjectStore, ['activeProject', 'hasActiveProject'])
   },
   components: {
     SearchTab,
@@ -788,7 +787,7 @@ export default {
     
     // Handle direct import to active project
     async handleImportToProject(paper) {
-      if (!this.activeProject || !this.activeProject.id) {
+      if (!this.hasActiveProject) {
         alert("Cannot import directly: No active project.");
         return;
       }

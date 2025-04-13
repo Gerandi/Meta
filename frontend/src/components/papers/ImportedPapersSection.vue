@@ -143,6 +143,8 @@ import {
   X, 
   Plus 
 } from 'lucide-vue-next';
+import { useProjectStore } from '../../stores/project';
+import { mapState, mapActions } from 'pinia';
 
 export default {
   name: 'ImportedPapersSection',
@@ -155,7 +157,7 @@ export default {
     Plus
   },
   props: {
-    activeProject: Object,
+    // activeProject removed - now using Pinia store
     isLoading: {
       type: Boolean,
       default: false
@@ -183,6 +185,9 @@ export default {
         description: ''
       }
     };
+  },
+  computed: {
+    ...mapState(useProjectStore, ['activeProject', 'hasActiveProject']),
   },
   mounted() {
     this.fetchProjects();
@@ -282,8 +287,8 @@ export default {
         return;
       }
       
-      // Check if a project is active
-      if (this.activeProject && this.activeProject.id) {
+      // Check if a project is active using the store
+      if (this.hasActiveProject) {
         // Directly add to the active project
         console.log(`Adding ${this.selectedImportedPapers.length} papers directly to active project: ${this.activeProject.name} (ID: ${this.activeProject.id})`);
         

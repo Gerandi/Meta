@@ -192,6 +192,8 @@
 <script>
 import SearchResultItem from './search-result-item.vue';
 import { Search, AlertCircle, Filter as FilterIcon } from 'lucide-vue-next';
+import { useProjectStore } from '../../../stores/project';
+import { mapState } from 'pinia';
 
 export default {
   name: 'SearchTab',
@@ -206,11 +208,11 @@ export default {
       searchUpdateTimeout: null
     };
   },
+  computed: {
+    ...mapState(useProjectStore, ['activeProject']),
+  },
   props: {
-    activeProject: {
-      type: Object,
-      default: null
-    },
+    // activeProject prop removed - now using Pinia store
     isLoading: {
       type: Boolean,
       default: false

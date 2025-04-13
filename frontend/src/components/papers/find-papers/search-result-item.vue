@@ -41,6 +41,8 @@
 
 <script>
 import { Database, Download, PlusCircle, Book } from 'lucide-vue-next';
+import { useProjectStore } from '../../../stores/project';
+import { mapState } from 'pinia';
 
 export default {
   name: 'SearchResultItem',
@@ -58,11 +60,11 @@ export default {
     selected: {
       type: Boolean,
       default: false
-    },
-    activeProject: {
-      type: Object,
-      default: null
     }
+    // activeProject prop removed - now using Pinia store
+  },
+  computed: {
+    ...mapState(useProjectStore, ['activeProject', 'hasActiveProject']),
   },
   emits: ['download', 'view-details', 'import-to-project', 'import-to-staging'],
   methods: {
@@ -110,7 +112,7 @@ export default {
     },
     
     handleImportAction() {
-      if (this.activeProject && this.activeProject.id) {
+      if (this.hasActiveProject) {
         // If project is active, emit event to add directly to project
         console.log(`Emitting import-to-project for paper: ${this.paper.title} to project ${this.activeProject.id}`);
         this.$emit('import-to-project', this.paper);

@@ -2,9 +2,8 @@
   <div class="flex h-screen bg-gray-100">
     <Sidebar 
       :activeView="activeView" 
-      :activeProject="activeProject"
       @change-view="setActiveView" 
-      @set-active-project="setActiveProject"
+      @set-active-project="handleSetActiveProject"
       ref="sidebar"
     />
     <div class="flex-1 flex flex-col overflow-hidden">
@@ -35,8 +34,8 @@
           v-bind="componentProps"
           @select-paper="handleSelectPaper"
           @view-project="handleViewProject"
-          @set-active-project="setActiveProject"
-          @clear-active-project="clearActiveProject"
+          @set-active-project="handleSetActiveProject"
+          @clear-active-project="handleClearActiveProject"
           @change-view="setActiveView"
           @process-papers="handleProcessPapers"
           @add-to-project="showProjectSelectModal"
@@ -83,6 +82,8 @@ import ConfirmationModal from './components/ConfirmationModal.vue';
 import { API_ROUTES } from './config.js';
 import { paperService } from './services/api';
 import { FolderOpen } from 'lucide-vue-next';
+import { useProjectStore } from './stores/project';
+import { mapState, mapActions } from 'pinia';
 
 export default {
   name: 'App',
@@ -106,7 +107,7 @@ export default {
       selectedPaper: null,
       selectedProjectId: null,
       selectedPapers: [], // Add selected papers array to store across navigation
-      activeProject: null,
+      // activeProject removed - now using Pinia store
       isProjectModalVisible: false,
       paperForProjectModal: null,
       resultsTableKey: 0, // Used to force refresh ResultsTable
@@ -122,6 +123,7 @@ export default {
     }
   },
   computed: {
+    ...mapState(useProjectStore, ['activeProject', 'hasActiveProject']),
     currentView() {
       switch(this.activeView) {
         case 'dashboard':
@@ -176,14 +178,15 @@ export default {
     },
     needsProject() {
       const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'resultsTable'];
-      return protectedViews.includes(this.activeView);
+      return protectedViews.includes(this.activeView) && !this.hasActiveProject;
     }
   },
   methods: {
+    ...mapActions(useProjectStore, ['setActiveProject', 'clearActiveProject', 'loadActiveProjectFromStorage']),
     setActiveView(view) {
       // Prevent accessing protected views without an active project
       const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'resultsTable'];
-      if (!this.activeProject && protectedViews.includes(view)) {
+      if (!this.hasActiveProject && protectedViews.includes(view)) {
         console.warn(`Cannot navigate to ${view} without an active project.`);
         // Redirect to projects view
         this.activeView = 'projects';
@@ -250,14 +253,11 @@ export default {
       this.resultsTableKey++;
     },
     
-    setActiveProject(project) {
-      this.activeProject = project;
-      
-      // Save to localStorage for persistence
-      localStorage.setItem('activeProjectId', project.id);
-      localStorage.setItem('activeProjectName', project.name);
-      
-      console.log('Active project set:', project.name);
+    // setActiveProject and clearActiveProject now using Pinia store actions
+    // These methods are kept but now delegate to the store
+    // They wrap the store actions to handle view navigation
+    handleSetActiveProject(project) {
+      this.setActiveProject(project);
       
       // If user was stuck on project selection prompt, navigate to dashboard
       if (this.needsProject && this.activeView === 'projects') {
@@ -265,10 +265,8 @@ export default {
       }
     },
     
-    clearActiveProject() {
-      this.activeProject = null;
-      localStorage.removeItem('activeProjectId');
-      localStorage.removeItem('activeProjectName');
+    handleClearActiveProject() {
+      this.clearActiveProject();
       
       // If current view requires a project, redirect to projects view
       if (this.needsProject) {
@@ -282,27 +280,7 @@ export default {
       this.activeView = 'processing';
     },
     
-    async loadActiveProject() {
-      const projectId = localStorage.getItem('activeProjectId');
-      
-      if (projectId) {
-        try {
-          const response = await fetch(API_ROUTES.PROJECTS.GET_BY_ID(projectId));
-          
-          if (response.ok) {
-            const project = await response.json();
-            this.activeProject = project;
-            console.log('Loaded active project:', project.name);
-          } else {
-            // If error, clear the stored active project
-            this.clearActiveProject();
-          }
-        } catch (error) {
-          console.error('Error loading active project:', error);
-          this.clearActiveProject();
-        }
-      }
-    },
+    // loadActiveProject method removed - now using Pinia store action
     
     // Method to show the project selection modal
     showProjectSelectModal(paper) {
@@ -359,8 +337,8 @@ export default {
     }
   },
   mounted() {
-    // Load active project from localStorage if available
-    this.loadActiveProject();
+    // Load active project from localStorage using the Pinia store
+    this.loadActiveProjectFromStorage();
   }
 }
 </script>
