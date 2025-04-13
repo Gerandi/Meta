@@ -31,18 +31,7 @@ import {
   ClipboardList,
   Grid,
   Edit3,
-  PenLine,
-  // Add missing icons
-  CheckCircle,
-  HelpCircle,
-  RefreshCw,
-  RotateCw,
-  AlertTriangle,
-  Clock,
-  Copy,
-  Loader2,
-  UploadCloud,
-  Link
+  PenLine
 } from 'lucide-vue-next'
 
 // Create Vue app
@@ -77,17 +66,6 @@ app.component('ClipboardList', ClipboardList)
 app.component('Grid', Grid)
 app.component('Edit3', Edit3)
 app.component('PenLine', PenLine)
-// Register missing icons
-app.component('CheckCircle', CheckCircle)
-app.component('HelpCircle', HelpCircle)
-app.component('RefreshCw', RefreshCw)
-app.component('RotateCw', RotateCw)
-app.component('AlertTriangle', AlertTriangle)
-app.component('Clock', Clock)
-app.component('Copy', Copy)
-app.component('Loader2', Loader2)
-app.component('UploadCloud', UploadCloud)
-app.component('Link', Link)
 
 // Mount app
 app.mount('#app')

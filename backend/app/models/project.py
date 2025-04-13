@@ -27,4 +27,3 @@ class Project(Base):
     
     # Relationships
     papers = relationship("Paper", secondary=paper_project, backref="projects")
-    coding_sheets = relationship("CodingSheet", back_populates="project", cascade="all, delete-orphan")

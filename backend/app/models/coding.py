@@ -3,7 +3,6 @@ from sqlalchemy import Column, String, Text, Boolean, Integer, JSON, ForeignKey,
 from sqlalchemy.orm import relationship
 
 from app.db.base_class import Base
-from app.models.project import Project
 
 
 class CodingSheet(Base):
@@ -16,10 +15,8 @@ class CodingSheet(Base):
     name = Column(String, index=True, nullable=False)
     description = Column(Text, nullable=True)
     sections = Column(JSON, nullable=False)  # List of CodingSection objects
-    project_id = Column(Integer, ForeignKey("project.id"), nullable=True, index=True)
     
     # Relationships
-    project = relationship("Project", back_populates="coding_sheets")
     coding_data = relationship("CodingData", back_populates="sheet", cascade="all, delete-orphan")
 
 
