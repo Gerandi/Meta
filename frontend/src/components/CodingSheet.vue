@@ -109,214 +109,30 @@
     </div>
     
     <!-- Field Edit Modal -->
-    <div v-if="showFieldModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-lg w-full max-w-md">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h3 class="font-medium">{{ editingIndex !== null ? 'Edit Field' : 'Add Field' }}</h3>
-          <button class="text-gray-400 hover:text-gray-600" @click="closeFieldModal">
-            <X size="18" />
-          </button>
-        </div>
-        
-        <div class="p-4">
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Field Name
-              </label>
-              <input 
-                v-model="fieldForm.label"
-                type="text" 
-                class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                placeholder="e.g., Authors"
-              />
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Field Type
-              </label>
-              <select 
-                v-model="fieldForm.type"
-                class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-              >
-                <option value="text">Text</option>
-                <option value="number">Number</option>
-                <option value="date">Date</option>
-                <option value="select">Dropdown</option>
-                <option value="textarea">Text Area</option>
-                <option value="boolean">Checkbox</option>
-                <option value="radio">Radio Button</option>
-              </select>
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea 
-                v-model="fieldForm.description"
-                class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                rows="2"
-                placeholder="e.g., Authors of the paper in citation format"
-              ></textarea>
-            </div>
-            
-            <div v-if="fieldForm.type === 'select'" class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Options (one per line)</label>
-              <textarea 
-                v-model="fieldForm.options" 
-                class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                rows="4"
-                placeholder="Option 1&#10;Option 2&#10;Option 3"
-              ></textarea>
-            </div>
-            
-            <div class="flex items-center">
-              <input 
-                type="checkbox" 
-                id="required" 
-                v-model="fieldForm.required"
-                class="mr-2"
-              />
-              <label for="required" class="text-sm text-gray-700">
-                Required field
-              </label>
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Extraction Settings
-              </label>
-              <div class="border rounded-lg p-3 bg-gray-50">
-                <div class="flex items-center mb-2">
-                  <input 
-                    type="checkbox" 
-                    id="auto-extract" 
-                    v-model="fieldForm.autoExtract"
-                    class="mr-2"
-                  />
-                  <label for="auto-extract" class="text-sm text-gray-700">
-                    Enable automated extraction
-                  </label>
-                </div>
-                <div class="mb-2">
-                  <label class="block text-sm text-gray-700 mb-1">
-                    Regular Expression Pattern (optional)
-                  </label>
-                  <input 
-                    type="text" 
-                    v-model="fieldForm.regexPattern"
-                    class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                    placeholder="e.g., (d|g)\s*=\s*([\d\.]+)"
-                  />
-                </div>
-                <div class="text-xs text-gray-500">
-                  Regex pattern to help identify the value in the text. Leave blank to use AI-based extraction.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="p-4 border-t flex justify-end">
-          <button 
-            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 mr-2"
-            @click="closeFieldModal"
-          >
-            Cancel
-          </button>
-          <button 
-            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-            @click="saveField"
-          >
-            Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
+    <FieldEditModal 
+      v-if="showFieldModal"
+      :field="fieldForm"
+      :isEdit="editingIndex !== null"
+      @close="closeFieldModal"
+      @save="saveField"
+    />
     
     <!-- Section Settings Modal -->
-    <div v-if="showSectionModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-lg w-full max-w-md">
-        <div class="p-4 border-b flex justify-between items-center">
-          <h3 class="font-medium">Section Settings</h3>
-          <button class="text-gray-400 hover:text-gray-600" @click="closeSectionModal">
-            <X size="18" />
-          </button>
-        </div>
-        
-        <div class="p-4">
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Section Title
-              </label>
-              <input 
-                v-model="sectionForm.title"
-                type="text" 
-                class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-              />
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea 
-                v-model="sectionForm.description"
-                class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                rows="2"
-              ></textarea>
-            </div>
-            
-            <div class="flex items-center">
-              <input 
-                type="checkbox" 
-                id="section-required" 
-                v-model="sectionForm.required"
-                class="mr-2"
-              />
-              <label for="section-required" class="text-sm text-gray-700">
-                Required section
-              </label>
-            </div>
-
-            <div v-if="sectionForm.fields && sectionForm.fields.length > 0" class="flex justify-between pt-4 border-t">
-              <span class="text-sm font-medium text-gray-700">
-                Contains {{ sectionForm.fields.length }} field(s)
-              </span>
-            </div>
-          </div>
-        </div>
-        
-        <div class="p-4 border-t flex justify-end">
-          <button 
-            class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 mr-auto"
-            @click="confirmDeleteSection"
-          >
-            Delete Section
-          </button>
-          <button 
-            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 mr-2"
-            @click="closeSectionModal"
-          >
-            Cancel
-          </button>
-          <button 
-            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-            @click="saveSection"
-          >
-            Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
+    <SectionSettingsModal 
+      v-if="showSectionModal"
+      :section="sectionForm"
+      @close="closeSectionModal"
+      @save="saveSection"
+      @delete="confirmDeleteSection"
+    />
   </div>
 </template>
 
 <script>
 import { API_ROUTES } from '../config.js';
+import { codingService } from '../services/api.js';
+import FieldEditModal from './modals/FieldEditModal.vue';
+import SectionSettingsModal from './modals/SectionSettingsModal.vue';
 import { 
   ArrowLeft, 
   Copy, 
@@ -327,8 +143,7 @@ import {
   HelpCircle, 
   Edit, 
   Trash2, 
-  PlusCircle, 
-  X
+  PlusCircle
 } from 'lucide-vue-next';
 
 export default {
@@ -344,7 +159,8 @@ export default {
     Edit, 
     Trash2, 
     PlusCircle,
-    X
+    FieldEditModal,
+    SectionSettingsModal
   },
   props: {
     projectId: {
@@ -425,30 +241,25 @@ export default {
         
         // Check if a coding sheet already exists for this project
         try {
-          const codingSheetResponse = await fetch(`${API_ROUTES.CODING.GET_BY_PROJECT_ID(this.projectId)}`);
+          const codingSheet = await codingService.getCodingSheetByProject(this.projectId);
+          this.codingSheetId = codingSheet.id;
           
-          if (codingSheetResponse.ok) {
-            // Existing coding sheet found, load it
-            const codingSheetData = await codingSheetResponse.json();
-            this.codingSheetId = codingSheetData.id;
-            
-            // Convert sections from object to array format for easier reordering
-            if (codingSheetData.sections && Array.isArray(codingSheetData.sections)) {
-              this.sectionsArray = codingSheetData.sections;
-            } else {
-              // Set default sections if no sections or incorrect format
-              this.setDefaultSections();
-            }
-          } else if (codingSheetResponse.status === 404) {
+          // Convert sections from object to array format for easier reordering
+          if (codingSheet.sections && Array.isArray(codingSheet.sections)) {
+            this.sectionsArray = codingSheet.sections;
+          } else {
+            // Set default sections if no sections or incorrect format
+            this.setDefaultSections();
+          }
+        } catch (error) {
+          // If 404 Not Found, create a default coding sheet
+          if (error.message && error.message.includes('404')) {
             console.log('No coding sheet found for this project yet. Using default template.');
             this.setDefaultSections();
           } else {
-            console.warn(`Error fetching coding sheet: ${codingSheetResponse.status}`);
+            console.error('Error checking for existing coding sheet:', error);
             this.setDefaultSections();
           }
-        } catch (codingSheetError) {
-          console.error('Error checking for existing coding sheet:', codingSheetError);
-          this.setDefaultSections();
         }
       } catch (error) {
         console.error('Error loading project data:', error);
@@ -560,19 +371,15 @@ export default {
       this.showSectionModal = true;
     },
     
-    saveSection() {
-      if (!this.sectionForm.title.trim()) {
-        alert('Section title is required');
-        return;
-      }
-      
+    saveSection(sectionData) {
       if (this.editingSectionIndex !== null) {
         // Update existing section
         const updatedSection = {
           ...this.sectionsArray[this.editingSectionIndex],
-          title: this.sectionForm.title,
-          description: this.sectionForm.description,
-          required: this.sectionForm.required
+          title: sectionData.title,
+          description: sectionData.description,
+          name: sectionData.name,
+          required: sectionData.required
         };
         
         this.$set(this.sectionsArray, this.editingSectionIndex, updatedSection);
@@ -665,39 +472,13 @@ export default {
       this.editingIndex = null;
     },
     
-    saveField() {
-      if (!this.fieldForm.label.trim()) {
-        alert('Field label is required');
-        return;
-      }
-      
-      // Generate a name from the label if not provided
-      if (!this.fieldForm.name) {
-        this.fieldForm.name = this.fieldForm.label
-          .toLowerCase()
-          .replace(/[^a-z0-9]/gi, '_');
-      }
-      
-      const field = {
-        name: this.fieldForm.name,
-        label: this.fieldForm.label,
-        type: this.fieldForm.type,
-        description: this.fieldForm.description,
-        required: this.fieldForm.required,
-        autoExtract: this.fieldForm.autoExtract,
-        regexPattern: this.fieldForm.regexPattern
-      };
-      
-      if (field.type === 'select' && this.fieldForm.options) {
-        field.options = this.fieldForm.options;
-      }
-      
+    saveField(fieldData) {
       if (this.editingIndex !== null) {
         // Update existing field
-        this.$set(this.sectionsArray[this.editingSection].fields, this.editingIndex, field);
+        this.$set(this.sectionsArray[this.editingSection].fields, this.editingIndex, fieldData);
       } else {
         // Add new field
-        this.sectionsArray[this.editingSection].fields.push(field);
+        this.sectionsArray[this.editingSection].fields.push(fieldData);
       }
       
       this.closeFieldModal();
@@ -744,41 +525,17 @@ export default {
           sections: this.sectionsArray
         };
         
-        // Determine if we're creating a new coding sheet or updating an existing one
-        let apiUrl;
-        let method;
+        let response;
         
         if (this.codingSheetId) {
           // Update existing coding sheet
-          apiUrl = API_ROUTES.CODING.UPDATE(this.codingSheetId);
-          method = 'PUT';
+          response = await codingService.updateCodingSheet(this.codingSheetId, codingSheet);
         } else {
           // Create new coding sheet
-          apiUrl = API_ROUTES.CODING.CREATE;
-          method = 'POST';
+          response = await codingService.createCodingSheet(codingSheet);
         }
         
-        console.log(`Saving coding sheet with ${method} to ${apiUrl}`);
-        
-        const response = await fetch(apiUrl, {
-          method: method,
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(codingSheet)
-        });
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error('API endpoint not found. The backend service might not be available.');
-          }
-          
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || `Failed to save coding sheet: ${response.statusText}`);
-        }
-        
-        const savedCodingSheet = await response.json();
-        this.codingSheetId = savedCodingSheet.id;
+        this.codingSheetId = response.id;
         
         // Mark as no longer having unsaved changes
         this.hasUnsavedChanges = false;
@@ -787,7 +544,7 @@ export default {
         alert('Coding sheet configuration saved successfully!');
         
         // Go back to project detail
-        this.goBack();
+        this.$emit('back-to-project');
       } catch (err) {
         console.error('Error saving coding sheet:', err);
         alert('Failed to save configuration. Please try again: ' + err.message);

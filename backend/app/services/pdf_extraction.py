@@ -8,6 +8,8 @@ import json
 import PyPDF2
 from io import BytesIO
 
+from app.services.openalex_direct import get_paper_by_doi_direct, search_papers_direct
+
 logger = logging.getLogger(__name__)
 
 async def extract_metadata_from_pdf(file_content: bytes) -> Dict[str, Any]:
@@ -166,13 +168,57 @@ async def enhance_metadata_with_api(basic_metadata: Dict[str, Any]) -> Dict[str,
     try:
         # If we have a DOI, use it to fetch more complete metadata
         if enhanced_metadata.get("doi"):
-            # This could be implemented to call DOI resolution services
-            pass
+            logger.info(f"Enhancing metadata using DOI: {enhanced_metadata['doi']}")
+            paper_data = await get_paper_by_doi_direct(enhanced_metadata["doi"])
+            
+            if paper_data:
+                logger.info("Successfully fetched metadata from OpenAlex using DOI")
+                # Merge OpenAlex data with existing metadata
+                enhanced_metadata = merge_metadata(enhanced_metadata, paper_data)
+            else:
+                logger.warning(f"DOI {enhanced_metadata['doi']} not found in OpenAlex")
         
-        # If we have a title but no DOI, try to search by title to find matching paper
+        # If no DOI but we have a title, try searching by title
         elif enhanced_metadata.get("title"):
-            # This could be implemented to search OpenAlex by title
-            pass
+            logger.info(f"Searching OpenAlex by title: {enhanced_metadata['title']}")
+            
+            # Build search query with title and authors if available
+            query = enhanced_metadata["title"]
+            
+            # Get authors for search if available
+            author = None
+            if enhanced_metadata.get("authors") and len(enhanced_metadata["authors"]) > 0:
+                if isinstance(enhanced_metadata["authors"][0], dict):
+                    author = enhanced_metadata["authors"][0].get("name")
+                elif isinstance(enhanced_metadata["authors"][0], str):
+                    author = enhanced_metadata["authors"][0]
+            
+            # Add year to search if available
+            year_from = None
+            year_to = None
+            if enhanced_metadata.get("year"):
+                year_from = enhanced_metadata["year"]
+                year_to = enhanced_metadata["year"]
+            
+            # Perform search with available metadata
+            results, count = await search_papers_direct(
+                query=query,
+                author=author,
+                year_from=year_from,
+                year_to=year_to,
+                per_page=5,
+                sort="relevance"
+            )
+            
+            if results and len(results) > 0:
+                # Use the first (most relevant) result
+                paper_data = results[0]
+                logger.info(f"Found matching paper in OpenAlex: {paper_data.get('title')}")
+                
+                # Merge OpenAlex data with existing metadata
+                enhanced_metadata = merge_metadata(enhanced_metadata, paper_data)
+            else:
+                logger.warning(f"No matching papers found in OpenAlex for title: {enhanced_metadata['title']}")
         
         return enhanced_metadata
     
@@ -180,6 +226,46 @@ async def enhance_metadata_with_api(basic_metadata: Dict[str, Any]) -> Dict[str,
         logger.error(f"Error enhancing metadata: {str(e)}")
         enhanced_metadata["enhancement_error"] = str(e)
         return enhanced_metadata
+
+
+def merge_metadata(pdf_metadata: Dict[str, Any], api_metadata: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Merge metadata from PDF extraction with API results, prioritizing API data.
+    
+    Args:
+        pdf_metadata: Metadata extracted from PDF
+        api_metadata: Metadata from API (OpenAlex)
+        
+    Returns:
+        Merged metadata
+    """
+    merged = pdf_metadata.copy()
+    
+    # Fields to prioritize from API
+    priority_fields = [
+        "title", "doi", "authors", "journal", "publication_date", 
+        "abstract", "volume", "issue", "publisher", "url",
+        "open_access_url", "is_open_access"
+    ]
+    
+    # Copy API data to merged metadata
+    for field in priority_fields:
+        if field in api_metadata and api_metadata[field]:
+            merged[field] = api_metadata[field]
+    
+    # Special handling for year/publication_date
+    if "publication_date" in api_metadata and api_metadata["publication_date"]:
+        try:
+            # Try to extract year from publication_date if it's a string
+            if isinstance(api_metadata["publication_date"], str):
+                merged["year"] = int(api_metadata["publication_date"][:4])
+            else:
+                # Keep existing year if we have it
+                pass
+        except (ValueError, IndexError):
+            pass
+    
+    return merged
 
 
 async def process_pdf_file(file_content: bytes, filename: str, project_id: Optional[int] = None) -> Dict[str, Any]:
@@ -208,7 +294,10 @@ async def process_pdf_file(file_content: bytes, filename: str, project_id: Optio
     if file_path:
         metadata["file_path"] = file_path
     
-    return metadata
+    # Enhance metadata with API lookup - added in the refactoring
+    enhanced_metadata = await enhance_metadata_with_api(metadata)
+    
+    return enhanced_metadata
 
 
 async def store_pdf_file(file_content: bytes, filename: str, project_id: Optional[int] = None) -> Optional[str]:

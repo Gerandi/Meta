@@ -1,6 +1,10 @@
 <template>
   <div class="p-6">
-    <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6">
+    <div 
+      class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6"
+      @dragover.prevent
+      @drop.prevent="handleDrop"
+    >
       <div class="mx-auto w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
         <UploadCloud class="text-indigo-600" size="32" />
       </div>
@@ -17,57 +21,61 @@
       <button 
         class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
         @click.stop="openFileDialog"
-        @dragover.prevent
-        @drop.prevent="handleDrop"
       >
         Select Files
       </button>
     </div>
 
-    <div class="bg-gray-50 rounded-lg p-4 mb-6">
-      <h3 class="font-medium mb-2">Upload Queue ({{ uploadQueue.length || 3 }})</h3>
+    <div v-if="uploadQueue.length > 0" class="bg-gray-50 rounded-lg p-4 mb-6">
+      <h3 class="font-medium mb-2">Upload Queue ({{ uploadQueue.length }})</h3>
       <div class="space-y-3">
         <UploadItem 
-          v-for="(item, index) in uploadQueue.length ? uploadQueue : mockUploadItems" 
+          v-for="(item, index) in uploadQueue" 
           :key="index"
           :item="item"
           @remove="$emit('remove-from-queue', index)"
         />
       </div>
+      
+      <div class="mt-4 flex justify-end">
+        <button 
+          class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          @click="uploadFiles"
+          :disabled="!hasQueuedFiles || uploading"
+        >
+          <span v-if="uploading">Uploading...</span>
+          <span v-else>Upload Files</span>
+        </button>
+      </div>
     </div>
 
     <div>
-      <h3 class="font-medium mb-2">Extraction Options</h3>
+      <h3 class="font-medium mb-2">Project Options</h3>
       <div class="space-y-3">
         <div class="flex items-center">
           <input 
-            :checked="extractionOptions.extractMetadata"
-            @change="updateExtractionOption('extractMetadata', $event.target.checked)"
-            type="checkbox" 
-            id="extract-metadata"
-            class="mr-2"
-          />
-          <label for="extract-metadata">Automatically extract metadata (title, authors, journal, etc.)</label>
-        </div>
-        <div class="flex items-center">
-          <input 
-            :checked="extractionOptions.applyCodingSheet"
-            @change="updateExtractionOption('applyCodingSheet', $event.target.checked)"
-            type="checkbox" 
-            id="apply-coding"
-            class="mr-2"
-          />
-          <label for="apply-coding">Apply coding sheet for automated data extraction</label>
-        </div>
-        <div class="flex items-center">
-          <input 
-            :checked="extractionOptions.addToProject"
-            @change="updateExtractionOption('addToProject', $event.target.checked)"
+            :checked="projectOption"
+            @change="updateOption('projectOption', $event.target.checked)"
             type="checkbox" 
             id="add-project"
             class="mr-2"
           />
           <label for="add-project">Add to current project</label>
+        </div>
+        
+        <div v-if="projectOption" class="pl-6">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Select Project
+          </label>
+          <select 
+            v-model="selectedProjectId"
+            class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+          >
+            <option value="">-- Select a Project --</option>
+            <option v-for="project in projects" :key="project.id" :value="project.id">
+              {{ project.name }}
+            </option>
+          </select>
         </div>
       </div>
     </div>
@@ -77,6 +85,7 @@
 <script>
 import UploadItem from './upload-item.vue';
 import { UploadCloud } from 'lucide-vue-next';
+import { API_ROUTES } from '../../../config.js';
 
 export default {
   name: 'UploadTab',
@@ -86,46 +95,20 @@ export default {
   },
   data() {
     return {
-      mockUploadItems: [
-        {
-          name: "Smith_et_al_2023_CBT_Meta_Analysis.pdf",
-          size: 2.4 * 1024 * 1024, // 2.4 MB
-          progress: 100,
-          status: "complete"
-        },
-        {
-          name: "Garcia_et_al_2022_Remote_Work.pdf",
-          size: 1.8 * 1024 * 1024, // 1.8 MB
-          progress: 65,
-          status: "uploading"
-        },
-        {
-          name: "Chen_et_al_2022_Vaccines.pdf",
-          size: 3.2 * 1024 * 1024, // 3.2 MB
-          progress: 0,
-          status: "queued"
-        }
-      ]
+      uploadQueue: [],
+      uploading: false,
+      projectOption: false,
+      selectedProjectId: '',
+      projects: []
     };
-  },
-  props: {
-    uploadQueue: {
-      type: Array,
-      default: () => []
-    },
-    extractionOptions: {
-      type: Object,
-      default: () => ({
-        extractMetadata: true,
-        applyCodingSheet: false,
-        addToProject: false
-      })
-    }
   },
   computed: {
     hasQueuedFiles() {
       return this.uploadQueue.some(item => item.status === 'queued');
     }
+  },
+  mounted() {
+    this.fetchProjects();
   },
   methods: {
     openFileDialog() {
@@ -134,7 +117,7 @@ export default {
     
     handleFileSelection(event) {
       if (event.target.files && event.target.files.length > 0) {
-        this.$emit('upload-files', event.target.files);
+        this.addFilesToQueue(Array.from(event.target.files));
         // Reset the input so the same file can be selected again
         event.target.value = '';
       }
@@ -146,14 +129,126 @@ export default {
       );
       
       if (files.length > 0) {
-        this.$emit('upload-files', files);
+        this.addFilesToQueue(files);
       }
     },
     
-    updateExtractionOption(key, value) {
-      const newOptions = { ...this.extractionOptions };
-      newOptions[key] = value;
-      this.$emit('update:extractionOptions', newOptions);
+    addFilesToQueue(files) {
+      const newQueue = [...this.uploadQueue];
+      
+      files.forEach(file => {
+        newQueue.push({
+          file,
+          name: file.name,
+          size: file.size,
+          progress: 0,
+          status: 'queued'
+        });
+      });
+      
+      this.uploadQueue = newQueue;
+    },
+    
+    updateOption(key, value) {
+      this[key] = value;
+    },
+    
+    async fetchProjects() {
+      try {
+        const response = await fetch(API_ROUTES.PROJECTS.LIST);
+        if (response.ok) {
+          this.projects = await response.json();
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+      }
+    },
+    
+    async uploadFiles() {
+      this.uploading = true;
+      
+      for (let i = 0; i < this.uploadQueue.length; i++) {
+        const item = this.uploadQueue[i];
+        if (item.status === 'queued') {
+          try {
+            // Update status to uploading
+            this.$set(this.uploadQueue, i, { ...item, status: 'uploading' });
+            
+            // Create form data
+            const formData = new FormData();
+            formData.append('file', item.file);
+            
+            // Add project ID if selected
+            if (this.projectOption && this.selectedProjectId) {
+              formData.append('project_id', this.selectedProjectId);
+            }
+            
+            // Directly upload to the simplified endpoint
+            const uploadUrl = API_ROUTES.PAPERS.UPLOAD;
+            
+            // Use XMLHttpRequest for progress tracking
+            await new Promise((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              
+              xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable) {
+                  const percentComplete = Math.round((event.loaded / event.total) * 100);
+                  this.$set(this.uploadQueue, i, { ...this.uploadQueue[i], progress: percentComplete });
+                }
+              });
+              
+              xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  try {
+                    const response = JSON.parse(xhr.responseText);
+                    // Store paper data in item
+                    this.$set(this.uploadQueue, i, {
+                      ...this.uploadQueue[i],
+                      status: 'complete',
+                      progress: 100,
+                      paper: response
+                    });
+                    resolve(response);
+                  } catch (e) {
+                    reject(new Error('Invalid response format'));
+                  }
+                } else {
+                  reject(new Error(`Upload failed: ${xhr.statusText}`));
+                }
+              });
+              
+              xhr.addEventListener('error', () => {
+                reject(new Error('Network error during upload'));
+              });
+              
+              xhr.open('POST', uploadUrl);
+              xhr.send(formData);
+            });
+            
+            // Emit event for successful upload
+            this.$emit('paper-imported', this.uploadQueue[i].paper);
+            
+          } catch (error) {
+            console.error(`Error uploading ${item.name}:`, error);
+            this.$set(this.uploadQueue, i, {
+              ...this.uploadQueue[i],
+              status: 'error',
+              error: error.message
+            });
+          }
+        }
+      }
+      
+      this.uploading = false;
+      
+      // Check if all uploads completed successfully
+      const allComplete = this.uploadQueue.every(item => item.status === 'complete');
+      if (allComplete) {
+        // Clear the queue after a delay to show completion
+        setTimeout(() => {
+          this.uploadQueue = [];
+        }, 2000);
+      }
     }
   }
 };

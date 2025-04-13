@@ -24,17 +24,7 @@
       </div>
 
       <div class="flex flex-wrap -mx-2 mb-4">
-        <div class="px-2 w-1/4">
-          <div class="mb-2 text-sm font-medium">Databases</div>
-          <select class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-            <option>All Databases</option>
-            <option>PubMed</option>
-            <option>Crossref</option>
-            <option>Semantic Scholar</option>
-            <option>OpenAlex</option>
-          </select>
-        </div>
-        <div class="px-2 w-1/4">
+        <div class="px-2 w-1/3">
           <div class="mb-2 text-sm font-medium">Year Range</div>
           <div class="flex">
             <input
@@ -53,7 +43,7 @@
             />
           </div>
         </div>
-        <div class="px-2 w-1/4">
+        <div class="px-2 w-1/3">
           <div class="mb-2 text-sm font-medium">Study Type</div>
           <select
             :value="filters.studyType"
@@ -67,7 +57,7 @@
             <option value="meta-analysis">Meta-Analysis</option>
           </select>
         </div>
-        <div class="px-2 w-1/4">
+        <div class="px-2 w-1/3">
           <div class="mb-2 text-sm font-medium">Sort By</div>
           <select
             :value="filters.sortBy"

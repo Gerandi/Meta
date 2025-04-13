@@ -12,21 +12,16 @@ from io import StringIO
 
 logger = logging.getLogger(__name__)
 
-from app.schemas.paper import Paper, PaperCreate # Removed PaperSearch as the endpoint is removed
-# Remove paper_provider import and directly import from service modules
+from app.schemas.paper import Paper, PaperCreate
 from app.services.paper import create_paper, get_paper_by_id, update_paper, delete_paper, list_papers
 from app.services.pdf_service import get_paper_pdf_url, get_paper_details
 from app.services.doi_service import get_doi_for_paper, get_dois_for_papers
-# Removed import for openalex_search as it's being deprecated
-from app.services.openalex_direct import search_papers_direct # Import the consolidated function
+from app.services.openalex_direct import search_papers_direct
 from app.services.pdf_extraction import process_pdf_file, extract_metadata_from_pdf, enhance_metadata_with_api
+from app.services.project import add_paper_to_project
 from app.db.session import get_db
 
 router = APIRouter()
-
-# Removed the redundant /search endpoint previously defined here
-# The main search endpoint is now in app/api/endpoints/search.py
-
 
 
 @router.post("/", response_model=Paper, status_code=status.HTTP_201_CREATED)
@@ -161,7 +156,6 @@ async def find_paper_doi(
             page=1,
             year_from=int(year) if year else None, # Ensure year is int
             year_to=int(year) if year else None,   # Ensure year is int
-            # Removed duplicate year_to=year,
             author=author,
             sort="relevance"
         )
@@ -262,23 +256,24 @@ async def batch_find_dois(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing CSV file: {str(e)}")
 
-# Advanced search endpoint removed - consolidated into main search endpoint
 
-
-@router.post("/upload", response_model=Dict[str, Any])
+@router.post("/upload", response_model=Paper)
 async def upload_pdf(
     file: UploadFile = File(...),
     project_id: Optional[int] = Query(None, description="Optional project ID to associate the file with"),
-    background_tasks: BackgroundTasks = None,
+    db: Session = Depends(get_db),
 ):
     """
-    Upload a PDF file and extract metadata.
+    Upload a PDF file, extract metadata, and save to database.
     
-    This endpoint accepts a PDF file upload, processes it to extract metadata,
-    and returns the extracted information including title, authors, and other
-    bibliographic data when available.
+    This endpoint handles the full process of:
+    1. Receiving the PDF upload
+    2. Extracting metadata from the PDF
+    3. Enhancing metadata with OpenAlex API
+    4. Creating a Paper record in the database
+    5. Associating with a project if project_id is provided
     
-    Optionally, the file can be associated with a project by providing the project_id parameter.
+    Returns the created Paper object.
     """
     try:
         # Check if the file is a PDF
@@ -288,96 +283,52 @@ async def upload_pdf(
         # Read the file contents
         file_content = await file.read()
         
-        # Process the PDF file and store it in the project folder if project_id is provided
+        # Process the PDF file - extract metadata and store file
         metadata = await process_pdf_file(file_content, file.filename, project_id)
         
-        # Set status based on metadata extraction success
-        if metadata.get("title"):
-            metadata["status"] = "success"
-        else:
-            metadata["status"] = "partial"
-            metadata["message"] = "Metadata extracted partially. Some fields may be missing."
+        # Create PaperCreate object from metadata
+        paper_data = {
+            "title": metadata.get("title") or "Unknown Title",
+            "authors": metadata.get("authors") or [],
+            "doi": metadata.get("doi"),
+            "abstract": metadata.get("abstract"),
+            "publication_date": None,  # Will be set based on year below
+            "journal": metadata.get("journal"),
+            "volume": metadata.get("volume"),
+            "issue": metadata.get("issue"),
+            "pages": metadata.get("pages"),
+            "publisher": metadata.get("publisher"),
+            "url": metadata.get("url") or metadata.get("doi"),
+            "keywords": metadata.get("keywords", []),
+            "is_open_access": metadata.get("is_open_access", False),
+            "open_access_url": metadata.get("open_access_url"),
+            "source": "PDF Upload",
+            "file_path": metadata.get("file_path")
+        }
         
-        # Add file_id to response for easier tracking
-        file_id = str(uuid.uuid4())
-        metadata["file_id"] = file_id
+        # Set publication date based on year if available
+        if metadata.get("year"):
+            from datetime import datetime
+            paper_data["publication_date"] = datetime(metadata["year"], 1, 1).isoformat()
+        elif metadata.get("publication_date"):
+            paper_data["publication_date"] = metadata["publication_date"]
+            
+        # Create paper in database
+        paper_create = PaperCreate(**paper_data)
+        paper = create_paper(db, paper_create)
         
-        return metadata
+        # If project_id is provided, add paper to project
+        if project_id and paper:
+            add_paper_to_project(db, paper.id, project_id)
+        
+        return paper
     
+    except HTTPException as e:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"Error processing PDF upload: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
-
-
-@router.post("/extract-metadata", response_model=List[Dict[str, Any]])
-async def extract_metadata_from_pdfs(
-    file_ids: List[str],
-    enhance: bool = Query(True, description="Enhance metadata using external APIs"),
-):
-    """
-    Extract metadata from previously uploaded PDF files.
-    
-    This endpoint processes PDF files that have already been uploaded to extract
-    more detailed metadata, optionally using external APIs to enhance the extraction.
-    """
-    try:
-        results = []
-        upload_dir = os.path.join(os.getcwd(), "uploads")
-        
-        for file_id in file_ids:
-            try:
-                # Find the uploaded file based on the file_id
-                # We assume file_id appears in the filename as per store_pdf_file function
-                matching_files = [f for f in os.listdir(upload_dir) if file_id in f]
-                
-                if not matching_files:
-                    logger.warning(f"No file found for ID: {file_id}")
-                    results.append({
-                        "file_id": file_id,
-                        "status": "error",
-                        "error": "File not found"
-                    })
-                    continue
-                
-                # Use the first matching file
-                file_path = os.path.join(upload_dir, matching_files[0])
-                
-                # Read the file content
-                with open(file_path, "rb") as f:
-                    file_content = f.read()
-                
-                # Extract metadata from the PDF
-                metadata = await extract_metadata_from_pdf(file_content)
-                
-                # Enhance metadata if requested
-                if enhance and metadata.get("title"):
-                    metadata = await enhance_metadata_with_api(metadata)
-                
-                # Add file path to metadata
-                metadata["file_path"] = file_path
-                metadata["filename"] = os.path.basename(file_path)
-                
-                result = {
-                    "file_id": file_id,
-                    "status": "success" if metadata.get("title") else "partial",
-                    "metadata": metadata
-                }
-                
-                results.append(result)
-                
-            except Exception as e:
-                logger.error(f"Error processing file {file_id}: {str(e)}")
-                results.append({
-                    "file_id": file_id,
-                    "status": "error",
-                    "error": str(e)
-                })
-        
-        return results
-    
-    except Exception as e:
-        logger.error(f"Error extracting metadata: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error extracting metadata: {str(e)}")
 
 
 @router.post("/import-batch", response_model=Dict[str, Any])
@@ -442,4 +393,3 @@ async def import_papers_batch(
     except Exception as e:
         logger.error(f"Error in batch import: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error importing papers: {str(e)}")
-

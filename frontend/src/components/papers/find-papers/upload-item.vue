@@ -16,12 +16,20 @@
     <div class="w-full bg-gray-200 rounded-full h-2.5">
       <div 
         class="h-2.5 rounded-full" 
-        :class="item.status === 'complete' ? 'bg-green-500' : 'bg-indigo-600'"
+        :class="getProgressBarClass()"
         :style="{ width: `${item.progress}%` }"
       ></div>
     </div>
-    <div class="text-xs text-gray-500 mt-1">
-      {{ item.status === 'complete' ? 'Complete' : item.status === 'uploading' ? `Uploading... ${item.progress}%` : 'Queued' }}
+    <div class="flex justify-between items-center text-xs mt-1">
+      <div :class="item.status === 'error' ? 'text-red-500' : 'text-gray-500'">
+        {{ getStatusText() }}
+      </div>
+      <div v-if="item.status === 'complete' && item.paper" class="text-indigo-600">
+        <a href="#" @click.prevent="viewPaper">View</a>
+      </div>
+    </div>
+    <div v-if="item.status === 'error'" class="mt-1 text-xs text-red-500">
+      {{ item.error || 'Upload failed' }}
     </div>
   </div>
 </template>
@@ -56,12 +64,30 @@ export default {
           return 'Queued';
         case 'uploading':
           return `Uploading... ${this.item.progress}%`;
+        case 'extracting':
+          return 'Extracting metadata...';
         case 'complete':
-          return 'Complete';
+          return 'Upload complete';
         case 'error':
           return 'Error';
         default:
           return this.item.status;
+      }
+    },
+    
+    getProgressBarClass() {
+      if (this.item.status === 'complete') {
+        return 'bg-green-500';
+      } else if (this.item.status === 'error') {
+        return 'bg-red-500';
+      } else {
+        return 'bg-indigo-600';
+      }
+    },
+    
+    viewPaper() {
+      if (this.item.paper) {
+        this.$emit('view-paper', this.item.paper);
       }
     }
   }

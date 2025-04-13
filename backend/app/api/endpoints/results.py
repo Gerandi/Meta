@@ -3,6 +3,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.schemas.results import ResultsTable, ResultsExport
+from app.services.results_service import get_results_table_service
 from app.db.session import get_db
 
 router = APIRouter()
@@ -16,8 +17,10 @@ async def get_results_table(
     """
     Get a formatted results table for a project.
     """
-    # Implementation will be added later
-    pass
+    try:
+        return get_results_table_service(db, project_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating results table: {str(e)}")
 
 
 @router.get("/export", response_model=ResultsExport)
@@ -29,5 +32,5 @@ async def export_results(
     """
     Export results in various formats.
     """
-    # Implementation will be added later
-    pass
+    # Implementation will be added later - beyond current scope
+    raise HTTPException(status_code=501, detail="Export functionality not implemented yet")

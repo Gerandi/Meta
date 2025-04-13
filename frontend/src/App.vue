@@ -44,6 +44,7 @@
           @project-list-changed="refreshProjectList"
           @configure-coding-sheet="configureCodingSheet"
           @back-to-project="handleBackToProject"
+          @coding-saved="refreshResultsTable"
         />
       </div>
     </div>
@@ -71,7 +72,7 @@
 import Sidebar from './components/Sidebar.vue';
 import Dashboard from './components/Dashboard.vue';
 import PaperSearch from './components/PaperSearch.vue';
-import PdfViewer from './components/PdfViewer.vue';
+import CodingView from './components/CodingView.vue';
 import PaperProcessing from './components/PaperProcessing.vue';
 import CodingSheet from './components/CodingSheet.vue';
 import ResultsTable from './components/ResultsTable.vue';
@@ -80,6 +81,7 @@ import ProjectDetail from './components/ProjectDetail.vue';
 import ProjectSelectModal from './components/ProjectSelectModal.vue';
 import ConfirmationModal from './components/ConfirmationModal.vue';
 import { API_ROUTES } from './config.js';
+import { paperService } from './services/api';
 import { FolderOpen } from 'lucide-vue-next';
 
 export default {
@@ -88,7 +90,7 @@ export default {
     Sidebar,
     Dashboard,
     PaperSearch,
-    PdfViewer,
+    CodingView,
     PaperProcessing,
     CodingSheet,
     ResultsTable,
@@ -107,6 +109,7 @@ export default {
       activeProject: null,
       isProjectModalVisible: false,
       paperForProjectModal: null,
+      resultsTableKey: 0, // Used to force refresh ResultsTable
       // Confirmation Modal State
       confirmationState: {
         show: false,
@@ -126,7 +129,7 @@ export default {
         case 'search':
           return PaperSearch;
         case 'viewer':
-          return PdfViewer;
+          return CodingView; // Changed from PdfViewer to CodingView
         case 'processing':
           return PaperProcessing;
         case 'codingSheet':
@@ -157,7 +160,10 @@ export default {
       }
       
       if (this.activeView === 'resultsTable' && this.activeProject) {
-        return { projectId: this.activeProject.id };
+        return { 
+          projectId: this.activeProject.id,
+          key: this.resultsTableKey // Add key to force refresh when coding is saved
+        };
       }
       if (this.activeView === 'processing') {
         return { selectedPapers: this.selectedPapers };
@@ -186,8 +192,12 @@ export default {
       this.activeView = view;
     },
     
-    handleSelectPaper(paper) {
+    handleSelectPaper(paper, projectId) {
       this.selectedPaper = paper;
+      if (projectId) {
+        // If a project ID was provided, update the selectedProjectId
+        this.selectedProjectId = projectId;
+      }
       this.activeView = 'viewer';
     },
     
@@ -233,6 +243,11 @@ export default {
         // Return to the project detail view
         this.activeView = 'projectDetail';
       }
+    },
+    
+    refreshResultsTable() {
+      // Increment the key to force refresh ResultsTable component when data is updated
+      this.resultsTableKey++;
     },
     
     setActiveProject(project) {
