@@ -16,10 +16,11 @@ def init_db() -> None:
     from app.models.paper import Paper
     from app.models.project import Project, paper_project
     from app.models.coding import CodingSheet, CodingData # Keep coding models
+    from app.models.user import User # Add User model
 
 
     
-    logger.info("Initializing database with models: Paper, Project, CodingSheet, CodingData")
+    logger.info("Initializing database with models: User, Paper, Project, CodingSheet, CodingData")
     
     inspector = inspect(engine)
     tables_before = set(inspector.get_table_names())

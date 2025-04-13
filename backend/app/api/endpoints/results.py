@@ -7,6 +7,8 @@ import logging
 from app.schemas.results import ResultsTable, ResultsExport
 from app.services.results_service import get_results_table_service
 from app.db.session import get_db
+from app.api import deps
+from app.models.user import User as UserModel
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +19,15 @@ router = APIRouter()
 async def get_results_table(
     project_id: int = Query(..., description="Project ID"),
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
     Get a formatted results table for a project.
     """
     try:
         # The service already handles the 'no coding sheet' case gracefully
-        results = get_results_table_service(db, project_id)
+        # Pass owner_id to verify project ownership
+        results = get_results_table_service(db, project_id, owner_id=current_user.id)
         return results
     except HTTPException as http_exc:
         # Re-raise HTTPExceptions directly
@@ -42,6 +46,7 @@ async def export_results(
     project_id: int = Query(..., description="Project ID"),
     format: str = Query("csv", description="Export format (csv, xlsx)"),
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
     Export results in various formats.

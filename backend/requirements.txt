@@ -9,3 +9,7 @@ aiosqlite
 pytest
 requests
 PyPDF2
+passlib[bcrypt]
+python-jose[cryptography]
+email_validator # For basic email validation during registration
+python-multipart # For handling form data in login

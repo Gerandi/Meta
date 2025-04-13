@@ -25,5 +25,9 @@ class Project(Base):
     name = Column(String, nullable=False, index=True)
     description = Column(Text, nullable=True)
     
+    # Owner relationship
+    owner_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    owner = relationship("User", back_populates="projects")
+    
     # Relationships
     papers = relationship("Paper", secondary=paper_project, backref="projects")

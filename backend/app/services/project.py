@@ -7,26 +7,28 @@ import logging
 
 from app.models.project import Project as ProjectModel, paper_project
 from app.models.paper import Paper as PaperModel, PaperStatus
+from app.models.user import User
 from app.schemas.project import ProjectCreate, ProjectUpdate
 
 logger = logging.getLogger(__name__)
 
-def get_project_by_id(db: Session, project_id: int) -> Optional[ProjectModel]:
+def get_project_by_id(db: Session, project_id: int, owner_id: int) -> Optional[ProjectModel]:
     """
-    Get a project by ID.
+    Get a project by ID and owner ID.
     """
-    return db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+    return db.query(ProjectModel).filter(ProjectModel.id == project_id, ProjectModel.owner_id == owner_id).first()
 
 
-def create_project(db: Session, project: ProjectCreate) -> ProjectModel:
+def create_project(db: Session, project: ProjectCreate, owner_id: int) -> ProjectModel:
     """
     Create a new project.
     """
-    logger.info(f"Attempting to create project with name: {project.name}")
+    logger.info(f"Attempting to create project '{project.name}' for owner_id: {owner_id}")
     try:
         db_project = ProjectModel(
             name=project.name,
-            description=project.description
+            description=project.description,
+            owner_id=owner_id
         )
         
         db.add(db_project)
@@ -41,13 +43,13 @@ def create_project(db: Session, project: ProjectCreate) -> ProjectModel:
         raise HTTPException(status_code=500, detail=f"Database error: Could not create project. {str(e)}")
 
 
-def update_project(db: Session, project_id: int, project: ProjectUpdate) -> ProjectModel:
+def update_project(db: Session, project_id: int, project: ProjectUpdate, owner_id: int) -> ProjectModel:
     """
     Update an existing project.
     """
-    db_project = get_project_by_id(db, project_id)
+    db_project = get_project_by_id(db, project_id, owner_id)
     if not db_project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="Project not found or not owned by user")
     
     # Update fields if provided
     if project.name is not None:
@@ -62,13 +64,13 @@ def update_project(db: Session, project_id: int, project: ProjectUpdate) -> Proj
     return db_project
 
 
-def delete_project(db: Session, project_id: int) -> bool:
+def delete_project(db: Session, project_id: int, owner_id: int) -> bool:
     """
     Delete a project.
     """
-    db_project = get_project_by_id(db, project_id)
+    db_project = get_project_by_id(db, project_id, owner_id)
     if not db_project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="Project not found or not owned by user")
     
     db.delete(db_project)
     db.commit()
@@ -76,16 +78,16 @@ def delete_project(db: Session, project_id: int) -> bool:
     return True
 
 
-def list_projects(db: Session, skip: int = 0, limit: int = 100) -> List[Dict]:
+def list_projects(db: Session, owner_id: int, skip: int = 0, limit: int = 100) -> List[Dict]:
     """
-    List all projects with paper counts.
+    List all projects with paper counts for a specific owner.
     """
     import logging
     logger = logging.getLogger(__name__)
     
     try:
-        # Get all projects with pagination
-        projects_query = db.query(ProjectModel).offset(skip).limit(limit).all()
+        # Get all projects with pagination, filtered by owner_id
+        projects_query = db.query(ProjectModel).filter(ProjectModel.owner_id == owner_id).offset(skip).limit(limit).all()
         logger.info(f"Found {len(projects_query)} projects in database")
         
         # Format the results with paper counts
@@ -113,13 +115,13 @@ def list_projects(db: Session, skip: int = 0, limit: int = 100) -> List[Dict]:
         return []  # Return empty list instead of letting the exception propagate
 
 
-def add_paper_to_project(db: Session, project_id: int, paper_id: int) -> ProjectModel:
+def add_paper_to_project(db: Session, project_id: int, paper_id: int, owner_id: int) -> ProjectModel:
     """
     Add a paper to a project.
     """
-    db_project = get_project_by_id(db, project_id)
+    db_project = get_project_by_id(db, project_id, owner_id)
     if not db_project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="Project not found or not owned by user")
     
     db_paper = db.query(PaperModel).filter(PaperModel.id == paper_id).first()
     if not db_paper:
@@ -140,13 +142,13 @@ def add_paper_to_project(db: Session, project_id: int, paper_id: int) -> Project
     return db_project
 
 
-def remove_paper_from_project(db: Session, project_id: int, paper_id: int) -> ProjectModel:
+def remove_paper_from_project(db: Session, project_id: int, paper_id: int, owner_id: int) -> ProjectModel:
     """
     Remove a paper from a project.
     """
-    db_project = get_project_by_id(db, project_id)
+    db_project = get_project_by_id(db, project_id, owner_id)
     if not db_project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="Project not found or not owned by user")
     
     db_paper = db.query(PaperModel).filter(PaperModel.id == paper_id).first()
     if not db_paper:
@@ -163,7 +165,7 @@ def remove_paper_from_project(db: Session, project_id: int, paper_id: int) -> Pr
     return db_project
 
 
-def add_papers_to_project_batch(db: Session, project_id: int, paper_ids: List[int]) -> Dict[str, Any]:
+def add_papers_to_project_batch(db: Session, project_id: int, paper_ids: List[int], owner_id: int) -> Dict[str, Any]:
     """
     Add multiple papers to a project in a single batch operation.
     
@@ -171,13 +173,14 @@ def add_papers_to_project_batch(db: Session, project_id: int, paper_ids: List[in
         db: Database session
         project_id: ID of the project to add papers to
         paper_ids: List of paper IDs to add to the project
+        owner_id: ID of the project owner
         
     Returns:
         Dictionary with summary of the operation (added_count, skipped_count)
     """
-    db_project = get_project_by_id(db, project_id)
+    db_project = get_project_by_id(db, project_id, owner_id)
     if not db_project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="Project not found or not owned by user")
     
     added_count = 0
     skipped_count = 0

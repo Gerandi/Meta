@@ -1,5 +1,19 @@
 // frontend/src/services/api.js
 import { API_ROUTES } from '../config';
+import { useAuthStore } from '../stores/auth'; // Import auth store
+
+// Helper to get headers with auth token
+function getAuthHeaders() {
+  const authStore = useAuthStore();
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+  if (authStore.isAuthenticated && authStore.token) {
+    headers['Authorization'] = `Bearer ${authStore.token}`;
+  }
+  return headers;
+}
 
 // Processing service for papers that need processing
 export const processingService = {
@@ -14,13 +28,14 @@ export const processingService = {
     });
     
     const url = `${API_ROUTES.PROCESSING.PROJECT_PROCESSING(projectId)}?${params.toString()}`;
-    const response = await fetch(url);
+    const response = await fetch(url, { headers: getAuthHeaders() });
     return handleResponse(response);
   },
 
   async retrievePdfForPaper(paperId) {
     const response = await fetch(API_ROUTES.PROCESSING.RETRIEVE_PDF(paperId), {
       method: 'POST',
+      headers: getAuthHeaders()
     });
     return handleResponse(response);
   },
@@ -28,13 +43,16 @@ export const processingService = {
   async markPaperReady(paperId) {
     const response = await fetch(API_ROUTES.PROCESSING.MARK_READY(paperId), {
       method: 'PUT',
+      headers: getAuthHeaders()
     });
     return handleResponse(response);
   },
 
   // Find duplicates within a project
   async findProjectDuplicates(projectId) {
-    const response = await fetch(`${API_ROUTES.PROCESSING.FIND_DUPLICATES}?project_id=${projectId}`);
+    const response = await fetch(`${API_ROUTES.PROCESSING.FIND_DUPLICATES}?project_id=${projectId}`, { 
+      headers: getAuthHeaders() 
+    });
     return handleResponse(response);
   },
   
@@ -42,6 +60,7 @@ export const processingService = {
   async fetchMetadataForPaper(paperId) {
     const response = await fetch(API_ROUTES.PROCESSING.FETCH_METADATA(paperId), {
       method: 'POST',
+      headers: getAuthHeaders()
     });
     return handleResponse(response);
   }
@@ -50,16 +69,24 @@ export const processingService = {
 async function handleResponse(response) {
   if (!response.ok) {
     let errorDetail = `HTTP error! status: ${response.status}`;
-    try {
-      const errorData = await response.json();
-      errorDetail = errorData.detail || errorData.message || JSON.stringify(errorData);
-    } catch (e) {
-      // Ignore if response body is not JSON
+    if (response.status === 401) {
+      // Unauthorized - likely invalid/expired token
+      const authStore = useAuthStore();
+      authStore.logout(); // Log out the user
+      // Optionally redirect to login page here using router
+      errorDetail = "Authentication failed. Please log in again.";
+    } else {
+      try {
+        const errorData = await response.json();
+        errorDetail = errorData.detail || errorData.message || JSON.stringify(errorData);
+      } catch (e) {
+        // Ignore if response body is not JSON
+      }
     }
     throw new Error(errorDetail);
   }
   // Handle cases with no content (e.g., DELETE)
-  if (response.status === 204) {
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
       return null;
   }
   return response.json();
@@ -67,14 +94,14 @@ async function handleResponse(response) {
 
 export const projectService = {
   async listProjects() {
-    const response = await fetch(API_ROUTES.PROJECTS.LIST);
+    const response = await fetch(API_ROUTES.PROJECTS.LIST, { headers: getAuthHeaders() });
     return handleResponse(response);
   },
   
   async importAndAddPaperToProject(projectId, paperData) {
     const response = await fetch(API_ROUTES.PROJECTS.IMPORT_PAPER(projectId), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(paperData),
     });
     return handleResponse(response);
@@ -83,21 +110,21 @@ export const projectService = {
   async createProject(projectData) {
     const response = await fetch(API_ROUTES.PROJECTS.CREATE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(projectData),
     });
     return handleResponse(response);
   },
   
   async getProject(projectId) {
-    const response = await fetch(API_ROUTES.PROJECTS.GET_BY_ID(projectId));
+    const response = await fetch(API_ROUTES.PROJECTS.GET_BY_ID(projectId), { headers: getAuthHeaders() });
     return handleResponse(response);
   },
   
   async updateProject(projectId, projectData) {
     const response = await fetch(API_ROUTES.PROJECTS.UPDATE(projectId), {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(projectData),
     });
     return handleResponse(response);
@@ -106,19 +133,20 @@ export const projectService = {
   async deleteProject(projectId) {
     const response = await fetch(API_ROUTES.PROJECTS.DELETE(projectId), {
       method: 'DELETE',
+      headers: getAuthHeaders()
     });
     return handleResponse(response);
   },
   
   async getProjectPapers(projectId) {
-    const response = await fetch(API_ROUTES.PROJECTS.GET_PAPERS(projectId));
+    const response = await fetch(API_ROUTES.PROJECTS.GET_PAPERS(projectId), { headers: getAuthHeaders() });
     return handleResponse(response);
   },
   
   async addPaperToProject(projectId, paperId) {
     const response = await fetch(API_ROUTES.PROJECTS.ADD_PAPER(projectId), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ paper_id: paperId }),
     });
     return handleResponse(response);
@@ -127,7 +155,7 @@ export const projectService = {
   async addPapersToProject(projectId, paperIds) {
     const response = await fetch(API_ROUTES.PROJECTS.ADD_PAPERS_BATCH(projectId), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ paper_ids: paperIds }),
     });
     return handleResponse(response);
@@ -136,6 +164,7 @@ export const projectService = {
   async removePaperFromProject(projectId, paperId) {
     const response = await fetch(API_ROUTES.PROJECTS.REMOVE_PAPER(projectId, paperId), {
       method: 'DELETE',
+      headers: getAuthHeaders()
     });
     return handleResponse(response);
   }
@@ -158,6 +187,7 @@ export const paperService = {
   async uploadPaper(formData, onProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
+      const authStore = useAuthStore();
       
       if (onProgress && typeof onProgress === 'function') {
         xhr.upload.addEventListener('progress', (event) => {
@@ -186,12 +216,16 @@ export const paperService = {
       });
       
       xhr.open('POST', API_ROUTES.PAPERS.UPLOAD);
+      // Set Authorization header for XHR
+      if (authStore.isAuthenticated && authStore.token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${authStore.token}`);
+      }
       xhr.send(formData);
     });
   },
   
   async getPaper(paperId) {
-    const response = await fetch(API_ROUTES.PAPERS.GET_BY_ID(paperId));
+    const response = await fetch(API_ROUTES.PAPERS.GET_BY_ID(paperId), { headers: getAuthHeaders() });
     return handleResponse(response);
   },
   
@@ -205,18 +239,19 @@ export const paperService = {
       }
     });
     
-    const response = await fetch(`${API_ROUTES.PAPERS.LIST}?${params.toString()}`);
+    const response = await fetch(`${API_ROUTES.PAPERS.LIST}?${params.toString()}`, { headers: getAuthHeaders() });
     return handleResponse(response);
   },
   
   async listImportedPapers(skip = 0, limit = 100) {
-    const response = await fetch(`${API_ROUTES.PAPERS.LIST_IMPORTED}?skip=${skip}&limit=${limit}`);
+    const response = await fetch(`${API_ROUTES.PAPERS.LIST_IMPORTED}?skip=${skip}&limit=${limit}`, { headers: getAuthHeaders() });
     return handleResponse(response);
   },
   
   async deletePaper(paperId) {
     const response = await fetch(API_ROUTES.PAPERS.DELETE(paperId), {
       method: 'DELETE',
+      headers: getAuthHeaders()
     });
     return handleResponse(response);
   },
@@ -224,7 +259,7 @@ export const paperService = {
   async batchDeletePapers(paperIds) {
     const response = await fetch(API_ROUTES.PAPERS.BATCH_DELETE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(paperIds), // This should be a list of paper IDs
     });
     return handleResponse(response);
@@ -233,21 +268,21 @@ export const paperService = {
   async updatePaper(paperId, paperData) {
     const response = await fetch(API_ROUTES.PAPERS.UPDATE(paperId), {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(paperData),
     });
     return handleResponse(response);
   },
   
   async getPaperPdf(doi) {
-    const response = await fetch(API_ROUTES.PAPERS.GET_PDF(doi));
+    const response = await fetch(API_ROUTES.PAPERS.GET_PDF(doi), { headers: getAuthHeaders() });
     return handleResponse(response);
   },
   
   async importPapersBatch(papers) {
     const response = await fetch(API_ROUTES.PAPERS.IMPORT_BATCH, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(papers),
     });
     return handleResponse(response);
@@ -258,31 +293,31 @@ export const codingService = {
   async createCodingSheet(codingSheetData) {
     const response = await fetch(API_ROUTES.CODING.SHEETS.CREATE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(codingSheetData),
     });
     return handleResponse(response);
   },
   
   async listCodingSheets() {
-    const response = await fetch(API_ROUTES.CODING.SHEETS.LIST);
+    const response = await fetch(API_ROUTES.CODING.SHEETS.LIST, { headers: getAuthHeaders() });
     return handleResponse(response);
   },
   
   async getCodingSheet(sheetId) {
-    const response = await fetch(API_ROUTES.CODING.SHEETS.GET_BY_ID(sheetId));
+    const response = await fetch(API_ROUTES.CODING.SHEETS.GET_BY_ID(sheetId), { headers: getAuthHeaders() });
     return handleResponse(response);
   },
   
   async getCodingSheetByProject(projectId) {
-    const response = await fetch(API_ROUTES.CODING.SHEETS.GET_BY_PROJECT_ID(projectId));
+    const response = await fetch(API_ROUTES.CODING.SHEETS.GET_BY_PROJECT_ID(projectId), { headers: getAuthHeaders() });
     return handleResponse(response);
   },
   
   async updateCodingSheet(sheetId, codingSheetData) {
     const response = await fetch(API_ROUTES.CODING.SHEETS.UPDATE(sheetId), {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(codingSheetData),
     });
     return handleResponse(response);
@@ -291,6 +326,7 @@ export const codingService = {
   async deleteCodingSheet(sheetId) {
     const response = await fetch(API_ROUTES.CODING.SHEETS.DELETE(sheetId), {
       method: 'DELETE',
+      headers: getAuthHeaders()
     });
     return handleResponse(response);
   },
@@ -298,7 +334,7 @@ export const codingService = {
   async createCodingData(codingData) {
     const response = await fetch(API_ROUTES.CODING.DATA.CREATE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(codingData),
     });
     return handleResponse(response);
@@ -309,14 +345,14 @@ export const codingService = {
     if (sheetId) {
       url += `?sheet_id=${sheetId}`;
     }
-    const response = await fetch(url);
+    const response = await fetch(url, { headers: getAuthHeaders() });
     return handleResponse(response);
   },
   
   async updateCodingData(codingDataId, codingData) {
     const response = await fetch(API_ROUTES.CODING.DATA.UPDATE(codingDataId), {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(codingData),
     });
     return handleResponse(response);
@@ -325,6 +361,7 @@ export const codingService = {
   async deleteCodingData(codingDataId) {
     const response = await fetch(API_ROUTES.CODING.DATA.DELETE(codingDataId), {
       method: 'DELETE',
+      headers: getAuthHeaders()
     });
     return handleResponse(response);
   }
@@ -332,12 +369,12 @@ export const codingService = {
 
 export const resultsService = {
   async getResultsTable(projectId) {
-    const response = await fetch(`${API_ROUTES.RESULTS.TABLE}?project_id=${projectId}`);
+    const response = await fetch(`${API_ROUTES.RESULTS.TABLE}?project_id=${projectId}`, { headers: getAuthHeaders() });
     return handleResponse(response);
   },
   
   async exportResults(projectId, format = 'csv') {
-    const response = await fetch(`${API_ROUTES.RESULTS.EXPORT}?project_id=${projectId}&format=${format}`);
+    const response = await fetch(`${API_ROUTES.RESULTS.EXPORT}?project_id=${projectId}&format=${format}`, { headers: getAuthHeaders() });
     return handleResponse(response);
   }
 };

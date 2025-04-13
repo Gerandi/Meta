@@ -64,6 +64,26 @@ class PaperCreate(PaperBase):
         }
 
 
+class PaperUpdate(BaseModel):
+    title: Optional[str] = Field(None, description="Title of the paper")
+    abstract: Optional[str] = Field(None, description="Abstract or summary of the paper")
+    doi: Optional[str] = Field(None, description="DOI in https://doi.org/format as provided by OpenAlex")
+    authors: Optional[List[Author]] = Field(None, description="List of authors with their affiliations")
+    publication_date: Optional[datetime] = Field(None, description="Publication date (YYYY-MM-DD)")
+    journal: Optional[str] = Field(None, description="Journal or publication venue name")
+    volume: Optional[str] = Field(None, description="Volume number")
+    issue: Optional[str] = Field(None, description="Issue number")
+    pages: Optional[str] = Field(None, description="Page range (e.g., '123-145')")
+    publisher: Optional[str] = Field(None, description="Publisher name")
+    url: Optional[str] = Field(None, description="URL to the publication")
+    keywords: Optional[List[str]] = Field(None, description="Subject keywords or concepts from OpenAlex")
+    is_open_access: Optional[bool] = Field(None, description="Whether this paper is available via open access")
+    open_access_url: Optional[str] = Field(None, description="URL to open access version if available")
+    citation_count: Optional[int] = Field(None, description="Number of citations according to OpenAlex")
+    references_count: Optional[int] = Field(None, description="Number of references in the paper")
+    status: Optional[PaperStatus] = Field(None, description="Current status of the paper in the workflow")
+
+
 class PaperSearch(BaseModel):
     query: str = Field(..., description="Search query text")
     fields: List[str] = Field(["title", "abstract", "authors", "keywords"], description="Fields to search in")

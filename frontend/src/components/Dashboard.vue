@@ -17,7 +17,7 @@
             :key="project.id"
             :title="project.name" 
             :papers="project.paperCount" 
-            :lastUpdated="formatLastUpdated(project.updatedAt)" 
+            :lastUpdated="formatLastUpdated(project.updated_at)" 
             @click="selectProject(project)"
           />
         </div>
@@ -109,6 +109,8 @@ import ProjectItem from './ProjectItem.vue';
 import ActionCard from './ActionCard.vue';
 import { API_ROUTES } from '../config.js';
 import { PlusCircle } from 'lucide-vue-next';
+import { projectService, paperService } from '../services/api';
+import { useAuthStore } from '../stores/auth';
 
 // Define the ActivityItem component
 const ActivityItem = {
@@ -254,28 +256,16 @@ export default {
   methods: {
     async fetchProjects() {
       try {
-        const response = await fetch(API_ROUTES.PROJECTS.LIST);
-        
-        if (!response.ok) {
-          throw new Error('Failed to load projects');
-        }
-        
-        const projects = await response.json();
+        // Use the projectService instead of direct fetch
+        const projects = await projectService.listProjects();
         
         // Get paper counts for each project
         this.projects = await Promise.all(projects.map(async project => {
           try {
-            const papersResponse = await fetch(API_ROUTES.PROJECTS.GET_PAPERS(project.id));
-            if (papersResponse.ok) {
-              const papers = await papersResponse.json();
-              return {
-                ...project,
-                paperCount: papers.length
-              };
-            }
+            const papers = await projectService.getProjectPapers(project.id);
             return {
               ...project,
-              paperCount: 0
+              paperCount: papers ? papers.length : 0
             };
           } catch (err) {
             console.error(`Error fetching papers for project ${project.id}:`, err);
@@ -287,7 +277,7 @@ export default {
         }));
         
         // Sort by most recently updated
-        this.projects.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+        this.projects.sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
         
         // Limit to the most recent 5 projects
         this.projects = this.projects.slice(0, 5);
@@ -298,19 +288,21 @@ export default {
     
     async fetchStats() {
       try {
-        // Fetch paper counts
-        const response = await fetch(API_ROUTES.PROCESSING.COUNTS);
+        // Use default values instead of trying to fetch from an endpoint that doesn't exist
+        this.stats = {
+          papersCollected: this.projects.reduce((total, project) => total + (project.paperCount || 0), 0),
+          papersCoded: 0,
+          dataPointsExtracted: 0
+        };
         
-        if (response.ok) {
-          const counts = await response.json();
-          this.stats = {
-            papersCollected: counts.totalPapers || 0,
-            papersCoded: counts.codedPapers || 0,
-            dataPointsExtracted: counts.dataPoints || 0
-          };
-        }
+        // You can implement a proper stats endpoint later and replace this
       } catch (err) {
-        console.error('Error fetching stats:', err);
+        console.error('Error calculating stats:', err);
+        this.stats = {
+          papersCollected: 0,
+          papersCoded: 0,
+          dataPointsExtracted: 0
+        };
       }
     },
     

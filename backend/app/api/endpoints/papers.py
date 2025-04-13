@@ -23,6 +23,8 @@ from app.services.openalex_direct import search_papers_direct
 from app.services.pdf_extraction import process_pdf_file, extract_metadata_from_pdf, enhance_metadata_with_api, store_pdf_file
 from app.services.project import add_paper_to_project
 from app.db.session import get_db
+from app.api import deps
+from app.models.user import User as UserModel
 
 router = APIRouter()
 
@@ -30,21 +32,25 @@ router = APIRouter()
 @router.get("/counts", response_model=Dict[str, int])
 async def get_paper_counts(
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
     Get counts of papers by various criteria.
     """
-    # Count total papers using the MODEL
-    total_count = db.query(PaperModel).count()
+    # Count total papers using the MODEL - filter by owner
+    total_count = db.query(PaperModel).filter(PaperModel.owner_id == current_user.id).count()
     
-    # Count papers with PDFs using the MODEL
-    with_pdf_count = db.query(PaperModel).filter(PaperModel.file_path.isnot(None)).count()
+    # Count papers with PDFs using the MODEL - filter by owner
+    with_pdf_count = db.query(PaperModel).filter(PaperModel.file_path.isnot(None), 
+                                                 PaperModel.owner_id == current_user.id).count()
     
-    # Count papers with DOIs using the MODEL
-    with_doi_count = db.query(PaperModel).filter(PaperModel.doi.isnot(None)).count()
+    # Count papers with DOIs using the MODEL - filter by owner
+    with_doi_count = db.query(PaperModel).filter(PaperModel.doi.isnot(None), 
+                                                PaperModel.owner_id == current_user.id).count()
     
-    # Count open access papers using the MODEL
-    open_access_count = db.query(PaperModel).filter(PaperModel.is_open_access == True).count()
+    # Count open access papers using the MODEL - filter by owner
+    open_access_count = db.query(PaperModel).filter(PaperModel.is_open_access == True, 
+                                                   PaperModel.owner_id == current_user.id).count()
     
     return {
         "total": total_count,
@@ -60,11 +66,13 @@ async def list_papers_for_cleanup(
     limit: int = Query(100, description="Maximum number of papers to return"),
     sort_by: str = Query("title", description="Field to sort by"),
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
     Get a list of papers with pagination and sorting for cleanup purposes.
     """
-    query = db.query(PaperModel)
+    # Filter by owner
+    query = db.query(PaperModel).filter(PaperModel.owner_id == current_user.id)
     
     # Add sorting
     if sort_by == "title":
@@ -82,12 +90,13 @@ async def list_papers_for_cleanup(
 async def save_paper(
     paper: PaperCreate,
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
     Save a paper to the database. If a paper with the same DOI already exists,
     the existing paper will be returned.
     """
-    return create_paper(db, paper)
+    return create_paper(db, paper, owner_id=current_user.id)
 
 
 @router.get("/imported", response_model=List[PaperSchema])
@@ -95,24 +104,26 @@ async def get_imported_papers(
     skip: int = Query(0, description="Number of papers to skip"),
     limit: int = Query(100, description="Maximum number of papers to return"),
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
     Get papers that have been imported but not yet added to a project.
     """
-    return list_imported_papers(db, skip, limit)
+    return list_imported_papers(db, skip, limit, owner_id=current_user.id)
 
 
 @router.get("/{paper_id}", response_model=PaperSchema)
 async def get_paper(
     paper_id: int = Path(..., description="The ID of the paper to retrieve"),
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
-    Get a specific paper by ID.
+    Get a specific paper by ID that is owned by the current user.
     """
-    db_paper = get_paper_by_id(db, paper_id)
+    db_paper = get_paper_by_id(db, paper_id, owner_id=current_user.id)
     if not db_paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        raise HTTPException(status_code=404, detail="Paper not found or not owned by user")
     return db_paper
 
 
@@ -121,22 +132,24 @@ async def update_paper_details(
     paper_id: int = Path(..., description="The ID of the paper to update"),
     paper_data: Dict[str, Any] = None,
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
-    Update specific fields of a paper.
+    Update specific fields of a paper owned by the current user.
     """
-    return update_paper(db, paper_id, paper_data)
+    return update_paper(db, paper_id, paper_data, owner_id=current_user.id)
 
 
 @router.delete("/{paper_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_paper_by_id(
     paper_id: int = Path(..., description="The ID of the paper to delete"),
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
-    Delete a paper by ID.
+    Delete a paper owned by the current user.
     """
-    delete_paper(db, paper_id)
+    delete_paper(db, paper_id, owner_id=current_user.id)
     return None
 
 
@@ -144,6 +157,7 @@ async def delete_paper_by_id(
 async def batch_delete_papers(
     paper_ids: List[int],  # This will be the request body
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
     Delete multiple papers by their IDs.
@@ -153,7 +167,7 @@ async def batch_delete_papers(
     
     for paper_id in paper_ids:
         try:
-            delete_paper(db, paper_id)
+            delete_paper(db, paper_id, owner_id=current_user.id)
             success_count += 1
         except Exception as e:
             logger.error(f"Failed to delete paper ID {paper_id}: {str(e)}")
@@ -171,14 +185,15 @@ async def batch_delete_papers(
 @router.head("/{paper_id}/content")
 async def get_paper_content(
     paper_id: int = Path(..., description="The ID of the paper"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user)
 ):
     """
     Get the content (PDF) of a paper stored locally.
     """
-    db_paper = get_paper_by_id(db, paper_id)
+    db_paper = get_paper_by_id(db, paper_id, owner_id=current_user.id)
     if not db_paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        raise HTTPException(status_code=404, detail="Paper not found or not owned by user")
 
     if not db_paper.file_path:
         raise HTTPException(status_code=404, detail="No local file associated with this paper")
@@ -201,12 +216,13 @@ async def get_paper_content(
 @router.get("/{paper_id}/proxy-pdf", response_class=StreamingResponse)
 async def proxy_external_pdf(
     paper_id: int = Path(..., description="The ID of the paper"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user)
 ):
     """Proxies an external PDF URL to avoid CORS issues in the frontend viewer."""
-    db_paper = get_paper_by_id(db, paper_id)
+    db_paper = get_paper_by_id(db, paper_id, owner_id=current_user.id)
     if not db_paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        raise HTTPException(status_code=404, detail="Paper not found or not owned by user")
     pdf_url = db_paper.open_access_url # Get the stored external URL
     if not pdf_url:
         raise HTTPException(status_code=404, detail="No external PDF URL associated with this paper")
@@ -245,11 +261,12 @@ async def get_papers(
     status: Optional[PaperStatus] = Query(None, description="Filter by paper status"),
     project_id: Optional[int] = Query(None, description="Filter by project ID"),
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
-    Get a list of papers with pagination and optional filters.
+    Get a list of papers with pagination and optional filters for papers owned by the current user.
     """
-    return list_papers(db, skip, limit, status, project_id)
+    return list_papers(db, skip, limit, status, project_id, owner_id=current_user.id)
 
 
 @router.get("/pdf/{doi}", response_model=Dict[str, Any])
@@ -429,6 +446,7 @@ async def upload_pdf(
     project_id: Optional[int] = Form(None, description="Optional project ID to associate the file with"),
     paper_id: Optional[int] = Form(None, description="Optional existing paper ID to associate the PDF with"),
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
     Upload a PDF file, extract metadata, and save to database.
@@ -452,9 +470,9 @@ async def upload_pdf(
 
         # --- Logic for associating with existing paper ---
         if paper_id:
-            db_paper = get_paper_by_id(db, paper_id)
+            db_paper = get_paper_by_id(db, paper_id, owner_id=current_user.id)
             if not db_paper:
-                raise HTTPException(status_code=404, detail=f"Paper with ID {paper_id} not found")
+                raise HTTPException(status_code=404, detail=f"Paper with ID {paper_id} not found or not owned by user")
 
             # Store the file
             file_path = await store_pdf_file(file_content, file.filename, project_id or db_paper.projects[0].id if db_paper.projects else None)
@@ -493,7 +511,8 @@ async def upload_pdf(
             "is_open_access": metadata.get("is_open_access", False),
             "open_access_url": metadata.get("open_access_url"),
             "source": "PDF Upload",
-            "file_path": metadata.get("file_path")
+            "file_path": metadata.get("file_path"),
+            "owner_id": current_user.id  # Set owner_id to current user
         }
         
         # Set publication date based on year if available
@@ -508,7 +527,7 @@ async def upload_pdf(
             
         # Create paper in database
         paper_create = PaperCreate(**paper_data)
-        paper = create_paper(db, paper_create)
+        paper = create_paper(db, paper_create, owner_id=current_user.id)
         
         # If project_id is provided, add paper to project
         if project_id and paper:
@@ -528,6 +547,7 @@ async def upload_pdf(
 async def import_papers_batch(
     papers: List[Dict[str, Any]],
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
 ):
     """
     Import multiple papers from search results.
@@ -551,7 +571,7 @@ async def import_papers_batch(
                 paper_create = PaperCreate(**paper_data)
                 
                 # Create or update the paper in the database
-                created_paper = create_paper(db, paper_create)
+                created_paper = create_paper(db, paper_create, owner_id=current_user.id)
                 
                 if created_paper:
                     # Add the successfully created/found paper to our result list

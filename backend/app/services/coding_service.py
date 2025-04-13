@@ -5,12 +5,13 @@ from datetime import datetime
 
 from app.models.coding import CodingSheet, CodingData
 from app.models.paper import Paper, PaperStatus
+from app.models.project import Project
 from app.schemas.coding import CodingSheetCreate, CodingDataCreate
 import logging
 
 logger = logging.getLogger(__name__)
 
-def create_coding_sheet_service(db: Session, coding_sheet: CodingSheetCreate) -> CodingSheet:
+def create_coding_sheet_service(db: Session, coding_sheet: CodingSheetCreate, owner_id: int) -> CodingSheet:
     """
     Create a new coding sheet.
     
@@ -34,19 +35,30 @@ def create_coding_sheet_service(db: Session, coding_sheet: CodingSheetCreate) ->
         db.rollback()
         raise Exception(f"Error creating coding sheet: {str(e)}")
 
-def list_coding_sheets_service(db: Session, skip: int = 0, limit: int = 100) -> List[CodingSheet]:
+def list_coding_sheets_service(db: Session, owner_id: int = None, project_id: int = None, skip: int = 0, limit: int = 100) -> List[CodingSheet]:
     """
     Get a list of all coding sheets.
     
     Args:
         db: Database session
+        owner_id: Optional ID of the user to filter by
+        project_id: Optional ID of the project to filter by
         skip: Number of records to skip
         limit: Maximum number of records to return
         
     Returns:
         List of CodingSheet objects
     """
-    return db.query(CodingSheet).offset(skip).limit(limit).all()
+    query = db.query(CodingSheet)
+    
+    if project_id:
+        query = query.filter(CodingSheet.project_id == project_id)
+        
+    if owner_id:
+        # Join with Project to filter by the project owner
+        query = query.join(Project).filter(Project.owner_id == owner_id)
+        
+    return query.offset(skip).limit(limit).all()
 
 def get_coding_sheet_service(db: Session, sheet_id: int) -> Optional[CodingSheet]:
     """
@@ -112,7 +124,7 @@ def delete_coding_sheet_service(db: Session, sheet_id: int) -> bool:
         db.rollback()
         raise Exception(f"Error deleting coding sheet: {str(e)}")
 
-def create_coding_data_service(db: Session, coding_data: CodingDataCreate) -> CodingData:
+def create_coding_data_service(db: Session, coding_data: CodingDataCreate, coder_id: Optional[int] = None) -> CodingData:
     """
     Create a new coding data entry or update if it already exists.
     Also updates the paper status to 'coded' when coding data is saved.
@@ -164,7 +176,7 @@ def create_coding_data_service(db: Session, coding_data: CodingDataCreate) -> Co
         logger.error(f"Error saving coding data for paper {coding_data.paper_id}: {e}")
         raise Exception(f"Error creating coding data: {str(e)}")
 
-def get_coding_data_service(db: Session, paper_id: int, sheet_id: Optional[int] = None) -> Optional[CodingData]:
+def get_coding_data_service(db: Session, paper_id: int, sheet_id: Optional[int] = None, owner_id: Optional[int] = None) -> Optional[CodingData]:
     """
     Get coding data for a paper.
     
@@ -181,9 +193,13 @@ def get_coding_data_service(db: Session, paper_id: int, sheet_id: Optional[int] 
     if sheet_id:
         query = query.filter(CodingData.sheet_id == sheet_id)
         
+    if owner_id:
+        # Join with Paper to filter by owner
+        query = query.join(Paper).filter(Paper.owner_id == owner_id)
+        
     return query.first()
 
-def update_coding_data_service(db: Session, coding_data_id: int, coding_data: Dict[str, Any]) -> Optional[CodingData]:
+def update_coding_data_service(db: Session, coding_data_id: int, coding_data: Dict[str, Any], coder_id: Optional[int] = None) -> Optional[CodingData]:
     """
     Update coding data and set paper status to CODED.
     
@@ -196,7 +212,13 @@ def update_coding_data_service(db: Session, coding_data_id: int, coding_data: Di
         Updated CodingData object if found, None otherwise
     """
     try:
-        db_coding_data = db.query(CodingData).filter(CodingData.id == coding_data_id).first()
+        query = db.query(CodingData).filter(CodingData.id == coding_data_id)
+        
+        if coder_id is not None:
+            # Only allow the coder to update their own coding data
+            query = query.filter(CodingData.coder_id == coder_id)
+        
+        db_coding_data = query.first()
         if not db_coding_data:
             return None
             
@@ -222,7 +244,7 @@ def update_coding_data_service(db: Session, coding_data_id: int, coding_data: Di
         logger.error(f"Error updating coding data: {e}")
         raise Exception(f"Error updating coding data: {str(e)}")
 
-def delete_coding_data_service(db: Session, coding_data_id: int) -> bool:
+def delete_coding_data_service(db: Session, coding_data_id: int, coder_id: Optional[int] = None) -> bool:
     """
     Delete coding data.
     
@@ -234,7 +256,13 @@ def delete_coding_data_service(db: Session, coding_data_id: int) -> bool:
         True if the coding data was deleted, False otherwise
     """
     try:
-        db_coding_data = db.query(CodingData).filter(CodingData.id == coding_data_id).first()
+        query = db.query(CodingData).filter(CodingData.id == coding_data_id)
+        
+        if coder_id is not None:
+            # Only allow the coder to delete their own coding data
+            query = query.filter(CodingData.coder_id == coder_id)
+            
+        db_coding_data = query.first()
         if not db_coding_data:
             return False
             
@@ -245,7 +273,7 @@ def delete_coding_data_service(db: Session, coding_data_id: int) -> bool:
         db.rollback()
         raise Exception(f"Error deleting coding data: {str(e)}")
 
-def get_coding_sheet_by_project_service(db: Session, project_id: int) -> Optional[CodingSheet]:
+def get_coding_sheet_by_project_service(db: Session, project_id: int, owner_id: Optional[int] = None) -> Optional[CodingSheet]:
     """
     Get the coding sheet associated with a project.
     
@@ -256,4 +284,10 @@ def get_coding_sheet_by_project_service(db: Session, project_id: int) -> Optiona
     Returns:
         CodingSheet object if found, None otherwise
     """
-    return db.query(CodingSheet).filter(CodingSheet.project_id == project_id).first()
+    query = db.query(CodingSheet).filter(CodingSheet.project_id == project_id)
+    
+    if owner_id:
+        # Join with Project to filter by the project owner
+        query = query.join(Project).filter(Project.owner_id == owner_id)
+        
+    return query.first()

@@ -31,9 +31,10 @@ class CodingData(Base):
     
     paper_id = Column(Integer, ForeignKey("paper.id"), nullable=False)
     sheet_id = Column(Integer, ForeignKey("codingsheet.id"), nullable=False)
-    coder_id = Column(Integer, nullable=True)  # Will be foreign key in the future
+    coder_id = Column(Integer, ForeignKey("user.id"), nullable=True)  # Link coder_id to user table
     data = Column(JSON, nullable=False)  # Dictionary of field values
     
     # Relationships
     paper = relationship("Paper", back_populates="coding_data")
     sheet = relationship("CodingSheet", back_populates="coding_data")
+    coder = relationship("User")  # Add relationship to User model

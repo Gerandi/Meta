@@ -1,5 +1,10 @@
 <template>
   <div class="w-64 bg-indigo-800 text-white p-4 flex flex-col h-full">
+    <!-- Debug message to confirm Sidebar is loaded -->
+    <div class="bg-yellow-500 text-black p-1 mb-2 text-xs">
+      Sidebar loaded: {{ user?.email || 'No user' }}
+    </div>
+    
     <div class="text-xl font-bold mb-4 pl-2">MetaReview</div>
     
     <!-- Active Project Dropdown Selector -->
@@ -27,66 +32,56 @@
         icon="LayoutGrid" 
         text="Dashboard" 
         :active="activeView === 'dashboard'" 
-        @click="changeView('dashboard')" 
-        :disabled="!activeProject"
+        @click="$emit('change-view', 'dashboard')" 
+        :disabled="false" <!-- Always enabled -->
       />
       <SidebarItem 
         icon="Search" 
         text="Find Papers" 
         :active="activeView === 'search'" 
-        @click="changeView('search')" 
-        :disabled="!activeProject"
+        @click="$emit('change-view', 'search')" 
+        :disabled="false" <!-- Always enabled -->
       />
       <SidebarItem 
         icon="ClipboardList" 
         text="Process Papers" 
         :active="activeView === 'processing'" 
-        @click="changeView('processing')" 
-        :disabled="!activeProject"
-      />
-      <SidebarItem 
-        icon="FileText" 
-        text="PDF Viewer" 
-        :active="activeView === 'viewer'" 
-        @click="changeView('viewer')" 
+        @click="$emit('change-view', 'processing')" 
         :disabled="!activeProject"
       />
       <SidebarItem 
         icon="PenLine" 
         text="Coding" 
-        :active="activeView === 'codingList' || activeView === 'codingSheet'" 
-        @click="changeView('coding')" 
+        :active="activeView === 'coding' || activeView === 'codingList' || activeView === 'codingSheet'" 
+        @click="$emit('change-view', 'coding')" 
         :disabled="!activeProject"
       />
       <SidebarItem 
         icon="Table" 
         text="Results Table" 
         :active="activeView === 'resultsTable'" 
-        @click="changeView('resultsTable')" 
+        @click="$emit('change-view', 'resultsTable')" 
         :disabled="!activeProject"
       />
       <SidebarItem 
         icon="Folder" 
         text="Projects" 
         :active="activeView === 'projects'" 
-        @click="changeView('projects')" 
-      />
-      <SidebarItem 
-        icon="Settings" 
-        text="Settings" 
-        :active="activeView === 'settings'" 
-        @click="changeView('settings')" 
+        @click="$emit('change-view', 'projects')"
+        :disabled="false" <!-- Always enabled -->
       />
     </nav>
     
     <div class="mt-auto pt-4 border-t border-indigo-700">
-      <div class="flex items-center p-2 rounded hover:bg-indigo-700 cursor-pointer">
+      <div class="flex items-center p-2 rounded hover:bg-indigo-700">
         <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center mr-2">
-          JD
+          <User size="16" />
         </div>
         <div>
-          <div class="text-sm font-semibold">John Doe</div>
-          <div class="text-xs text-indigo-300">Researcher</div>
+          <div class="text-sm font-semibold">{{ user?.email || 'User' }}</div>
+          <div class="text-xs flex items-center text-indigo-300 hover:text-white cursor-pointer" @click="handleLogout">
+            <LogOut size="14" class="mr-1" /> Logout
+          </div>
         </div>
       </div>
     </div>
@@ -95,24 +90,27 @@
 
 <script>
 import SidebarItem from './SidebarItem.vue';
-import { API_ROUTES } from '../config.js';
 import { useProjectStore } from '../stores/project';
+import { useAuthStore } from '../stores/auth';
+import { User, LogOut } from 'lucide-vue-next';
 import { mapState, mapActions } from 'pinia';
 
 export default {
   name: 'Sidebar',
   components: {
-    SidebarItem
+    SidebarItem,
+    User,
+    LogOut
   },
   props: {
     activeView: {
       type: String,
-      required: true
+      default: 'dashboard'
     }
-    // activeProject prop removed - now using Pinia store
   },
   computed: {
-    ...mapState(useProjectStore, ['activeProject', 'hasActiveProject', 'projects', 'isLoading', 'error'])
+    ...mapState(useProjectStore, ['activeProject', 'hasActiveProject', 'projects', 'isLoading', 'error']),
+    ...mapState(useAuthStore, ['user'])
   },
   data() {
     return {
@@ -133,7 +131,7 @@ export default {
     // Handle special "manage" option
     selectedProjectId(newVal) {
       if (newVal === 'manage') {
-        this.goToProjects();
+        this.$emit('change-view', 'projects');
         // Restore previous selection to avoid the dropdown staying on "Manage Projects"
         this.$nextTick(() => {
           this.selectedProjectId = this.previousSelectedId || null;
@@ -144,6 +142,10 @@ export default {
     }
   },
   mounted() {
+    console.log("Sidebar mounted - current user:", this.user?.email);
+    console.log("Sidebar mounted - active project:", this.activeProject);
+    console.log("Sidebar mounted - projects length:", this.projects?.length);
+
     this.selectedProjectId = this.activeProject ? this.activeProject.id : null;
     if (this.selectedProjectId) {
       this.previousSelectedId = this.selectedProjectId;
@@ -152,24 +154,8 @@ export default {
   },
   methods: {
     ...mapActions(useProjectStore, ['setActiveProject', 'clearActiveProject', 'fetchProjects']),
-    changeView(view) {
-      // If no active project and trying to access a protected view, show project selector
-      const protectedViews = ['dashboard', 'search', 'processing', 'viewer', 'codingSheet', 'codingList', 'resultsTable'];
-      if (!this.activeProject && protectedViews.includes(view)) {
-         console.warn("Cannot navigate: No active project selected.");
-         return;
-      }
-      
-      // Special handling for coding navigation
-      if (view === 'coding') {
-        this.$emit('change-view', 'codingList');
-      } else {
-        this.$emit('change-view', view);
-      }
-    },
-
-    // fetchProjects now comes from Pinia store
-
+    ...mapActions(useAuthStore, ['logout']),
+    
     handleProjectChange() {
       if (this.selectedProjectId === 'manage') {
         return; // This is handled by the watcher
@@ -178,11 +164,15 @@ export default {
       const selectedProject = this.projects.find(p => p.id === this.selectedProjectId);
       if (selectedProject) {
         this.setActiveProject(selectedProject);
+        this.$emit('set-active-project', selectedProject);
       }
     },
-
-    goToProjects() {
-      this.$emit('change-view', 'projects');
+    
+    async handleLogout() {
+      await this.logout();
+      if (this.$router) {
+        this.$router.push('/login');
+      }
     }
   }
 }

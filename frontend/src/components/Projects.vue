@@ -135,6 +135,8 @@
 <script>
 import { API_ROUTES } from '../config.js';
 import { Plus, FolderOpen, MoreVertical } from 'lucide-vue-next';
+import { projectService } from '../services/api.js';
+import { useAuthStore } from '../stores/auth';
 
 export default {
   name: 'Projects',
@@ -175,37 +177,9 @@ export default {
       this.error = null;
       
       try {
-        console.log('Fetching projects from:', API_ROUTES.PROJECTS.LIST);
-        const response = await fetch(API_ROUTES.PROJECTS.LIST, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          let errorDetail = 'Failed to load projects';
-          try {
-            const errorData = await response.json();
-            console.error('Error response:', errorData);
-            if (errorData.detail) {
-              errorDetail = errorData.detail;
-            }
-          } catch (e) {
-            console.error('Error parsing error response:', e);
-            errorDetail = `Server error: ${response.status} ${response.statusText}`;
-          }
-          throw new Error(errorDetail);
-        }
-        
-        const projects = await response.json().catch(err => {
-          console.error('Error parsing JSON:', err, 'Response:', response);
-          throw new Error('Failed to parse server response');
-        });
-        console.log('Fetched projects:', projects);
-        this.projects = projects || [];
-        console.log('Projects array after update:', this.projects);
+        // Use projectService instead of direct fetch
+        this.projects = await projectService.listProjects();
+        console.log('Fetched projects:', this.projects);
       } catch (err) {
         this.error = err.message;
         console.error('Error fetching projects:', err);
@@ -268,47 +242,19 @@ export default {
     
     async saveProject() {
       try {
-        let url = API_ROUTES.PROJECTS.CREATE;
-        let method = 'POST';
+        let savedProject;
         
         if (this.showEditModal) {
-          url = API_ROUTES.PROJECTS.UPDATE(this.editingProjectId);
-          method = 'PUT';
+          // Use projectService for update
+          savedProject = await projectService.updateProject(this.editingProjectId, this.formData);
+        } else {
+          // Use projectService for create
+          savedProject = await projectService.createProject(this.formData);
         }
         
-        console.log(`Saving project with ${method} to ${url}:`, this.formData);
-        
-        const response = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(this.formData)
-        });
-        
-        if (!response.ok) {
-          let errorDetail = 'Failed to save project';
-          try {
-            const errorData = await response.json();
-            console.error('Error response:', errorData);
-            if (errorData.detail) {
-              errorDetail = errorData.detail;
-            }
-          } catch (e) {
-            console.error('Error parsing error response:', e);
-          }
-          throw new Error(errorDetail);
-        }
-        
-        const savedProject = await response.json().catch(err => {
-          console.error('Error parsing JSON response:', err);
-          return this.formData; // Use form data as fallback
-        });
         console.log('Project saved successfully:', savedProject);
         
         // Refresh projects list
-        console.log('Refreshing projects list after save...');
         await this.fetchProjects();
         
         // Emit event to notify parent components about project list change
@@ -324,14 +270,8 @@ export default {
     
     async deleteProject(projectId) {
       try {
-        const response = await fetch(API_ROUTES.PROJECTS.DELETE(projectId), {
-          method: 'DELETE'
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || 'Failed to delete project');
-        }
+        // Use projectService for delete
+        await projectService.deleteProject(projectId);
         
         // If this was the active project, clear it
         const activeProjectId = localStorage.getItem('activeProjectId');

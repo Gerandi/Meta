@@ -9,12 +9,14 @@ from datetime import datetime
 
 from app.db.session import get_db
 from app.models.paper import Paper as PaperModel, PaperStatus
-from app.models.project import paper_project
+from app.models.project import paper_project, Project as ProjectModel
 from app.schemas.paper import Paper as PaperSchema
 from app.services.paper import get_paper_by_id, update_paper, list_papers
 from app.services.pdf_service import get_paper_pdf_url
 from app.services.openalex_direct import get_paper_by_doi_direct, search_papers_direct
 from app.services.pdf_extraction import merge_metadata
+from app.api import deps
+from app.models.user import User as UserModel
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,7 @@ router = APIRouter()
 async def get_papers_for_processing(
     project_id: int = Path(..., description="Filter by project ID"),
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
     skip: int = Query(0, description="Number of papers to skip"),
     limit: int = Query(100, description="Maximum number of papers to return"),
     search: Optional[str] = Query(None, description="Search term"),
@@ -33,6 +36,12 @@ async def get_papers_for_processing(
     """
     Get papers within a specific project that need processing (status='processing').
     """
+    # First, verify project ownership
+    project = db.query(ProjectModel).filter(ProjectModel.id == project_id, 
+                                           ProjectModel.owner_id == current_user.id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found or not owned by user")
+        
     query = db.query(PaperModel)\
               .join(paper_project)\
               .filter(paper_project.c.project_id == project_id)\
@@ -98,14 +107,15 @@ async def update_paper_metadata(
     journal: Optional[str] = Form(None, description="Journal name"),
     year: Optional[int] = Form(None, description="Publication year"),
     authors: Optional[str] = Form(None, description="Author names (JSON format)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user)
 ):
     """
     Update basic metadata for a paper.
     """
-    paper = get_paper_by_id(db, paper_id)
+    paper = get_paper_by_id(db, paper_id, owner_id=current_user.id)
     if not paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        raise HTTPException(status_code=404, detail="Paper not found or not owned by user")
     
     update_data = {}
     
@@ -135,7 +145,7 @@ async def update_paper_metadata(
             raise HTTPException(status_code=400, detail="Invalid authors JSON format")
     
     # Update the paper
-    updated_paper = update_paper(db, paper_id, update_data)
+    updated_paper = update_paper(db, paper_id, update_data, owner_id=current_user.id)
     
     return updated_paper
 
@@ -143,20 +153,25 @@ async def update_paper_metadata(
 @router.get("/find-duplicates", response_model=List[Dict[str, Any]])
 async def find_duplicate_papers(
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user),
     project_id: Optional[int] = Query(None, description="Filter by project ID")
 ):
     """
     Find potential duplicate papers using title similarity.
     Returns groups of papers that might be duplicates.
     """
-    # Query to find papers with identical titles
+    # Query to find papers with identical titles, filtered by owner
     subquery = db.query(
         PaperModel.title, 
         func.count(PaperModel.id).label('count')
-    )
+    ).filter(PaperModel.owner_id == current_user.id)
     
-    # Apply project filter if specified
+    # Apply project filter if specified - also verify project ownership if specified
     if project_id:
+        project = db.query(ProjectModel).filter(ProjectModel.id == project_id, 
+                                               ProjectModel.owner_id == current_user.id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found or not owned by user")
         subquery = subquery.filter(PaperModel.projects.any(id=project_id))
     
     subquery = subquery.group_by(
@@ -165,8 +180,8 @@ async def find_duplicate_papers(
         func.count(PaperModel.id) > 1
     ).subquery()
     
-    # Get all papers with duplicate titles
-    query = db.query(PaperModel).join(
+    # Get all papers with duplicate titles - filter by owner
+    query = db.query(PaperModel).filter(PaperModel.owner_id == current_user.id).join(
         subquery, 
         PaperModel.title == subquery.c.title
     )
@@ -210,15 +225,16 @@ async def find_duplicate_papers(
 @router.post("/papers/{paper_id}/retrieve-pdf", response_model=Dict[str, Any])
 async def retrieve_pdf_for_paper(
     paper_id: int = Path(..., description="The ID of the paper to retrieve PDF for"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user)
 ):
     """
     Attempt to retrieve a PDF for a paper using its DOI.
     Also updates paper status to READY_TO_CODE if successful.
     """
-    paper = get_paper_by_id(db, paper_id)
+    paper = get_paper_by_id(db, paper_id, owner_id=current_user.id)
     if not paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        raise HTTPException(status_code=404, detail="Paper not found or not owned by user")
     
     if not paper.doi:
         raise HTTPException(status_code=400, detail="Paper does not have a DOI")
@@ -232,7 +248,7 @@ async def retrieve_pdf_for_paper(
                 "open_access_url": pdf_url,
                 "status": PaperStatus.READY_TO_CODE
             }
-            updated_paper = update_paper(db, paper_id, update_data) # Use the service
+            updated_paper = update_paper(db, paper_id, update_data, owner_id=current_user.id) # Pass owner_id
             logger.info(f"PDF URL found for paper {paper_id}. Status updated to READY_TO_CODE.")
             return { "success": True, "pdf_url": pdf_url, "message": "PDF URL retrieved and paper ready for coding" }
         else:
@@ -247,12 +263,13 @@ async def retrieve_pdf_for_paper(
 @router.post("/papers/{paper_id}/fetch-metadata", response_model=PaperSchema)
 async def fetch_and_update_metadata(
     paper_id: int = Path(..., description="The ID of the paper to fetch metadata for"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user)
 ):
     """Fetches metadata from OpenAlex based on DOI or title/author and updates the paper."""
-    db_paper = get_paper_by_id(db, paper_id)
+    db_paper = get_paper_by_id(db, paper_id, owner_id=current_user.id)
     if not db_paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        raise HTTPException(status_code=404, detail="Paper not found or not owned by user")
 
     api_metadata = None
     try:
@@ -288,7 +305,7 @@ async def fetch_and_update_metadata(
             update_data = {k: v for k, v in merged_data.items() if hasattr(PaperModel, k) and k not in ['id', 'created_at', 'updated_at']}
 
             # Perform the update
-            updated_paper = update_paper(db, paper_id, update_data)
+            updated_paper = update_paper(db, paper_id, update_data, owner_id=current_user.id)
             logger.info(f"Successfully updated metadata for paper {paper_id}")
             return updated_paper
         else:
@@ -304,18 +321,19 @@ async def fetch_and_update_metadata(
 @router.put("/papers/{paper_id}/mark-ready", response_model=PaperSchema)
 async def mark_paper_ready_for_coding(
     paper_id: int = Path(..., description="The ID of the paper to mark as ready"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user)
 ):
     """
     Manually mark a paper as ready for coding.
     Use this when PDF is manually confirmed or not relevant for coding.
     """
-    paper = get_paper_by_id(db, paper_id)
+    paper = get_paper_by_id(db, paper_id, owner_id=current_user.id)
     if not paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        raise HTTPException(status_code=404, detail="Paper not found or not owned by user")
 
     if paper.status == PaperStatus.PROCESSING:
-        updated_paper = update_paper(db, paper_id, {"status": PaperStatus.READY_TO_CODE})
+        updated_paper = update_paper(db, paper_id, {"status": PaperStatus.READY_TO_CODE}, owner_id=current_user.id)
         return updated_paper
     else:
         # Return current paper if status is not PROCESSING

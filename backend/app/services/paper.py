@@ -4,15 +4,19 @@ from fastapi import HTTPException
 from datetime import datetime
 
 from app.models.paper import Paper as PaperModel, PaperStatus
+from app.models.user import User
 from app.schemas.paper import PaperCreate, Paper as PaperSchema
 from app.schemas.paper import Author as AuthorSchema
 
 
-def get_paper_by_id(db: Session, paper_id: int) -> Optional[PaperModel]:
+def get_paper_by_id(db: Session, paper_id: int, owner_id: Optional[int] = None) -> Optional[PaperModel]:
     """
-    Get a paper by ID.
+    Get a paper by ID, optionally filtering by owner_id.
     """
-    return db.query(PaperModel).filter(PaperModel.id == paper_id).first()
+    query = db.query(PaperModel).filter(PaperModel.id == paper_id)
+    if owner_id is not None:
+        query = query.filter(PaperModel.owner_id == owner_id)
+    return query.first()
 
 
 def get_paper_by_doi(db: Session, doi: str) -> Optional[PaperModel]:
@@ -22,9 +26,9 @@ def get_paper_by_doi(db: Session, doi: str) -> Optional[PaperModel]:
     return db.query(PaperModel).filter(PaperModel.doi == doi).first()
 
 
-def create_paper(db: Session, paper: PaperCreate) -> PaperModel:
+def create_paper(db: Session, paper: PaperCreate, owner_id: Optional[int] = None) -> PaperModel:
     """
-    Create a new paper record.
+    Create a new paper record with optional owner.
     """
     # Check if paper with this DOI already exists
     if paper.doi:
@@ -67,7 +71,8 @@ def create_paper(db: Session, paper: PaperCreate) -> PaperModel:
         is_open_access=paper.is_open_access,
         open_access_url=paper.open_access_url,
         file_path=paper.file_path,
-        status=status
+        status=status,
+        owner_id=owner_id
     )
     
     # Add to database
@@ -78,13 +83,16 @@ def create_paper(db: Session, paper: PaperCreate) -> PaperModel:
     return db_paper
 
 
-def update_paper(db: Session, paper_id: int, paper_data: Dict[str, Any]) -> PaperModel:
+def update_paper(db: Session, paper_id: int, paper_data: Dict[str, Any], owner_id: Optional[int] = None) -> PaperModel:
     """
-    Update an existing paper.
+    Update an existing paper, optionally checking ownership.
     """
-    db_paper = get_paper_by_id(db, paper_id)
+    db_paper = get_paper_by_id(db, paper_id, owner_id)
     if not db_paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        if owner_id:
+            raise HTTPException(status_code=404, detail="Paper not found or not owned by user")
+        else:
+            raise HTTPException(status_code=404, detail="Paper not found")
     
     # Update fields
     for field, value in paper_data.items():
@@ -98,13 +106,16 @@ def update_paper(db: Session, paper_id: int, paper_data: Dict[str, Any]) -> Pape
     return db_paper
 
 
-def delete_paper(db: Session, paper_id: int) -> bool:
+def delete_paper(db: Session, paper_id: int, owner_id: Optional[int] = None) -> bool:
     """
-    Delete a paper.
+    Delete a paper, optionally checking ownership.
     """
-    db_paper = get_paper_by_id(db, paper_id)
+    db_paper = get_paper_by_id(db, paper_id, owner_id)
     if not db_paper:
-        raise HTTPException(status_code=404, detail="Paper not found")
+        if owner_id:
+            raise HTTPException(status_code=404, detail="Paper not found or not owned by user")
+        else:
+            raise HTTPException(status_code=404, detail="Paper not found")
     
     db.delete(db_paper)
     db.commit()
@@ -112,11 +123,15 @@ def delete_paper(db: Session, paper_id: int) -> bool:
     return True
 
 
-def list_papers(db: Session, skip: int = 0, limit: int = 100, status: Optional[PaperStatus] = None, project_id: Optional[int] = None) -> List[PaperModel]:
+def list_papers(db: Session, skip: int = 0, limit: int = 100, status: Optional[PaperStatus] = None, project_id: Optional[int] = None, owner_id: Optional[int] = None) -> List[PaperModel]:
     """
-    List papers with pagination and optional filters for status and project_id.
+    List papers with pagination and optional filters for status, project_id, and owner_id.
     """
     query = db.query(PaperModel)
+    
+    # Apply owner filter if provided
+    if owner_id:
+        query = query.filter(PaperModel.owner_id == owner_id)
     
     # Apply status filter if provided
     if status:
@@ -130,13 +145,14 @@ def list_papers(db: Session, skip: int = 0, limit: int = 100, status: Optional[P
     return query.order_by(PaperModel.created_at.desc()).offset(skip).limit(limit).all()
 
 
-def list_imported_papers(db: Session, skip: int = 0, limit: int = 100) -> List[PaperModel]:
+def list_imported_papers(db: Session, skip: int = 0, limit: int = 100, owner_id: Optional[int] = None) -> List[PaperModel]:
     """
     Get papers that have been imported but not yet added to a project.
     """
-    return db.query(PaperModel)\
-            .filter(PaperModel.status == PaperStatus.IMPORTED)\
-            .order_by(PaperModel.created_at.desc())\
-            .offset(skip)\
-            .limit(limit)\
-            .all()
+    query = db.query(PaperModel).filter(PaperModel.status == PaperStatus.IMPORTED)
+    
+    # Apply owner filter if provided
+    if owner_id:
+        query = query.filter(PaperModel.owner_id == owner_id)
+    
+    return query.order_by(PaperModel.created_at.desc()).offset(skip).limit(limit).all()

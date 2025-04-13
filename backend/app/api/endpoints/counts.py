@@ -6,24 +6,28 @@ import logging
 
 from app.db.session import get_db
 from app.models.paper import Paper as PaperModel
+from app.api import deps
+from app.models.user import User as UserModel
 
 router = APIRouter()
 
 @router.get("/papers/counts", response_model=Dict[str, Any])
-async def get_paper_counts(db: Session = Depends(get_db)):
+async def get_paper_counts(db: Session = Depends(get_db), current_user: UserModel = Depends(deps.get_current_active_user)):
     """
     Get counts of papers by category for dashboard metrics.
     """
     try:
-        # Get total papers count
-        total_count = db.query(func.count(PaperModel.id)).scalar()
+        # Get total papers count for current user
+        total_count = db.query(func.count(PaperModel.id))\
+                       .filter(PaperModel.owner_id == current_user.id).scalar()
         
-        # Count papers with potential duplicates
+        # Count papers with potential duplicates - filter by owner
         # Subquery to find papers with similar titles
         duplicate_titles = db.query(
             PaperModel.title,
             func.count(PaperModel.id).label('count')
-        ).group_by(
+        ).filter(PaperModel.owner_id == current_user.id)\
+        .group_by(
             PaperModel.title
         ).having(
             func.count(PaperModel.id) > 1
@@ -36,10 +40,11 @@ async def get_paper_counts(db: Session = Depends(get_db)):
             PaperModel.title == duplicate_titles.c.title
         ).scalar()
         
-        # Count papers with incomplete metadata
+        # Count papers with incomplete metadata - filter by owner
         incomplete_count = db.query(
             func.count(PaperModel.id)
         ).filter(
+            PaperModel.owner_id == current_user.id,
             or_(
                 PaperModel.journal == None,
                 PaperModel.journal == "",
@@ -51,20 +56,22 @@ async def get_paper_counts(db: Session = Depends(get_db)):
             )
         ).scalar()
         
-        # Count papers with missing PDFs
+        # Count papers with missing PDFs - filter by owner
         missing_pdf_count = db.query(
             func.count(PaperModel.id)
         ).filter(
+            PaperModel.owner_id == current_user.id,
             or_(
                 PaperModel.open_access_url == None,
                 PaperModel.open_access_url == ""
             )
         ).scalar()
         
-        # Count papers with available PDFs
+        # Count papers with available PDFs - filter by owner
         available_pdf_count = db.query(
             func.count(PaperModel.id)
         ).filter(
+            PaperModel.owner_id == current_user.id,
             PaperModel.open_access_url != None,
             PaperModel.open_access_url != ""
         ).scalar()

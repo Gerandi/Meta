@@ -3,6 +3,11 @@ export const API_BASE_URL = 'http://localhost:8000';
 
 // Routes
 export const API_ROUTES = {
+    AUTH: {
+        TOKEN: `${API_BASE_URL}/auth/token`,
+        REGISTER: `${API_BASE_URL}/auth/register`,
+        GET_ME: `${API_BASE_URL}/auth/users/me`,
+    },
     PAPERS: {
         BASE_URL: API_BASE_URL,
         SEARCH: `${API_BASE_URL}/search/papers`,

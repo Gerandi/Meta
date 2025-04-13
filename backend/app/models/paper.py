@@ -38,5 +38,9 @@ class Paper(Base):
     file_path = Column(String, nullable=True)  # Store path to locally saved PDF
     status = Column(SQLAlchemyEnum(PaperStatus), default=PaperStatus.IMPORTED, nullable=False, index=True)
     
+    # Add owner relationship (for papers potentially outside projects)
+    owner_id = Column(Integer, ForeignKey("user.id"), nullable=True) # Nullable if paper can exist before user assignment
+    owner = relationship("User") # Define the relationship if needed directly
+    
     # Relationships
     coding_data = relationship("CodingData", back_populates="paper", cascade="all, delete-orphan")

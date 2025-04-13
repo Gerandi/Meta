@@ -27,3 +27,28 @@ class ResultsExport(BaseModel):
     data: str  # Base64 encoded file content
     filename: str
     mime_type: str  # application/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, etc.
+
+
+class PaperSearchResult(BaseModel):
+    id: Optional[int] = None
+    title: str
+    doi: Optional[str] = None
+    url: Optional[str] = None
+    journal: Optional[str] = None
+    publication_date: Optional[datetime] = None
+    authors: List[Dict[str, str]] = []
+    is_open_access: bool = False
+    abstract: Optional[str] = None
+    open_access_url: Optional[str] = None
+    source: str = "OpenAlex"
+    
+    class Config:
+        from_attributes = True
+
+
+class SearchResults(BaseModel):
+    results: List[PaperSearchResult]
+    total_results: int
+    page: int = 1
+    page_size: int = 10
+    query: str = ""
