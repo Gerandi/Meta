@@ -28,6 +28,7 @@ export const API_ROUTES = {
         ADD_PAPERS_BATCH: (projectId) => `${API_BASE_URL}/projects/${projectId}/papers/batch/`,
         REMOVE_PAPER: (projectId, paperId) => `${API_BASE_URL}/projects/${projectId}/papers/${paperId}/`,
         GET_PAPERS: (projectId) => `${API_BASE_URL}/projects/${projectId}/papers/`,
+        IMPORT_PAPER: (projectId) => `${API_BASE_URL}/projects/${projectId}/import-paper`,
     },
     PROCESSING: {
         CLEANUP: `${API_BASE_URL}/papers/cleanup`,

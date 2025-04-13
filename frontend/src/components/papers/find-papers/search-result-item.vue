@@ -58,8 +58,13 @@ export default {
     selected: {
       type: Boolean,
       default: false
+    },
+    activeProject: {
+      type: Object,
+      default: null
     }
   },
+  emits: ['download', 'view-details', 'import-to-project', 'import-to-staging'],
   methods: {
     formatAuthors(authors) {
       if (!authors || authors.length === 0) return 'Unknown Authors';
@@ -105,8 +110,15 @@ export default {
     },
     
     handleImportAction() {
-      // First import the paper, then add to project
-      this.$emit('add-to-project');
+      if (this.activeProject && this.activeProject.id) {
+        // If project is active, emit event to add directly to project
+        console.log(`Emitting import-to-project for paper: ${this.paper.title} to project ${this.activeProject.id}`);
+        this.$emit('import-to-project', this.paper);
+      } else {
+        // If no project active, emit event to add to staging (imported list)
+        console.log(`Emitting import-to-staging for paper: ${this.paper.title}`);
+        this.$emit('import-to-staging', this.paper);
+      }
     }
   }
 };

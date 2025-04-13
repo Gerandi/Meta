@@ -168,10 +168,12 @@
             <SearchResultItem
               :paper="paper"
               :selected="isSelected(paper)"
+              :activeProject="activeProject"
               @toggle-selection="$emit('toggle-selection', paper)"
               @view="$emit('view-paper', paper)"
               @download="$emit('download-pdf', paper)"
-              @add-to-project="$emit('add-to-project', paper)"
+              @import-to-project="handleImportToProject(paper)"
+              @import-to-staging="handleImportToStaging(paper)"
               @view-details="$emit('view-details', paper)"
             />
           </div>
@@ -205,6 +207,10 @@ export default {
     };
   },
   props: {
+    activeProject: {
+      type: Object,
+      default: null
+    },
     isLoading: {
       type: Boolean,
       default: false
@@ -250,6 +256,12 @@ export default {
       default: false
     }
   },
+  emits: [
+    'toggle-selection', 'view-paper', 'download-pdf', 'view-details',
+    'search', 'update:searchQuery', 'update:filters', 'toggle-more-filters',
+    'clear-filters', 'prev-page', 'next-page',
+    'import-to-project', 'import-to-staging'
+  ],
   methods: {
     updateFilter(key, value) {
       // Make sure to update filters in parent component
@@ -278,6 +290,15 @@ export default {
       }
       // Otherwise compare by title
       return paper1.title === paper2.title;
+    },
+    
+    // Relay the new events
+    handleImportToProject(paper) {
+      this.$emit('import-to-project', paper);
+    },
+    
+    handleImportToStaging(paper) {
+      this.$emit('import-to-staging', paper);
     }
   }
 };

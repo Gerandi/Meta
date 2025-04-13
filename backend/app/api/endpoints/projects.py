@@ -4,13 +4,18 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.schemas.project import Project, ProjectCreate, ProjectUpdate, ProjectWithPaperCount
-from app.schemas.paper import Paper
+from app.schemas.paper import Paper as PaperSchema, PaperCreate
 from app.services.project import (
     create_project, get_project_by_id, update_project, 
     delete_project, list_projects, add_paper_to_project,
     remove_paper_from_project, add_papers_to_project_batch
 )
 from app.db.session import get_db
+from app.services.paper import create_paper
+from app.models.paper import PaperStatus
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -119,7 +124,48 @@ async def remove_paper_from_project_by_id(
     return remove_paper_from_project(db, project_id, paper_id)
 
 
-@router.get("/{project_id}/papers", response_model=List[Paper])
+@router.post("/{project_id}/import-paper", response_model=PaperSchema, status_code=status.HTTP_201_CREATED)
+async def import_and_add_paper_to_project(
+    project_id: int = Path(..., description="The ID of the project to add the paper to"),
+    paper_data: PaperCreate = Body(..., description="Data for the paper to import"),
+    db: Session = Depends(get_db)
+):
+    """
+    Imports a single paper directly into a project with 'processing' status.
+    Checks for duplicates based on DOI before creating.
+    """
+    db_project = get_project_by_id(db, project_id)
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Set status to PROCESSING directly
+    paper_data.status = PaperStatus.PROCESSING
+
+    try:
+        # create_paper handles DOI duplication check
+        db_paper = create_paper(db, paper_data)
+
+        # Add paper to project if not already associated
+        # (create_paper might return an existing paper)
+        if db_paper not in db_project.papers:
+            db_project.papers.append(db_paper)
+            db.commit()
+            db.refresh(db_paper) # Refresh to get updated relationships if needed
+        
+        # Ensure the status is PROCESSING even if paper existed
+        if db_paper.status != PaperStatus.PROCESSING:
+             db_paper.status = PaperStatus.PROCESSING
+             db.commit()
+             db.refresh(db_paper)
+
+        return db_paper
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error importing paper directly to project {project_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Could not import paper: {str(e)}")
+
+
+@router.get("/{project_id}/papers", response_model=List[PaperSchema])
 async def get_papers_in_project(
     project_id: int = Path(..., description="The ID of the project"),
     db: Session = Depends(get_db)

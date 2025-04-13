@@ -24,6 +24,7 @@
 
       
             <SearchTab v-if="activeTab === 'search'" 
+              :activeProject="activeProject"
               :isLoading="isLoading"
               :searchQuery="searchQuery"
               :filters="filters"
@@ -46,7 +47,8 @@
               @next-page="nextPage"
               @view-paper="viewPaper"
               @download-pdf="downloadPdf"
-              @add-to-project="addToProject"
+              @import-to-project="handleImportToProject"
+              @import-to-staging="handleImportToStaging"
               @view-details="viewDetails"
               @add-selected-to-project="addSelectedToProject"
             />
@@ -170,6 +172,12 @@ import {
 
 export default {
   name: 'PaperSearch',
+  props: {
+    activeProject: {
+      type: Object,
+      default: null
+    }
+  },
   components: {
     SearchTab,
     UploadTab,
@@ -778,22 +786,87 @@ export default {
       }
     },
     
-    addToProject(paper) {
-      // Add single paper to selected project
-      
-      // First import the paper to get a database ID
-      if (!paper.id) {
-        // Paper from search results doesn't have an ID yet - needs to be imported first
-        console.log('Paper needs to be imported first before adding to project');
-        
-        // Import single paper
-        this.selectedPapers = [paper];
-        this.importSelectedPapers();
-      } else {
-        // Paper already has an ID (from imported papers list)
-        this.selectedImportedPapers = [paper.id];
-        this.showProjectModal = true;
+    // Handle direct import to active project
+    async handleImportToProject(paper) {
+      if (!this.activeProject || !this.activeProject.id) {
+        alert("Cannot import directly: No active project.");
+        return;
       }
+      this.isLoading = true; // Show loading indicator
+      try {
+        // Prepare paper data for the backend
+        const formattedPaper = this.formatPaperForImport(paper);
+        formattedPaper.status = 'processing'; // Ensure status is set correctly
+
+        const result = await projectService.importAndAddPaperToProject(
+          this.activeProject.id,
+          formattedPaper
+        );
+        alert(`Paper "${result.title}" added directly to project "${this.activeProject.name}".`);
+        // Optionally: Refresh project paper count
+        this.$emit('refresh-project', this.activeProject.id);
+      } catch (error) {
+        console.error('Error importing paper directly to project:', error);
+        alert(`Failed to add paper directly to project: ${error.message}`);
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    // Handle import to staging area (imported list)
+    async handleImportToStaging(paper) {
+      this.isLoading = true;
+      try {
+        const formattedPaper = this.formatPaperForImport(paper);
+        formattedPaper.status = 'imported'; // Ensure status is imported
+
+        const result = await paperService.importPapersBatch([formattedPaper]);
+        if (result.imported_count > 0) {
+          alert(`Paper "${formattedPaper.title}" imported. Go to 'Imported Papers' to add it to a project.`);
+          // Refresh the imported papers list
+          this.$refs.importedPapersSection?.fetchImportedPapers();
+        } else {
+          alert(`Failed to import paper: ${result.errors?.[0]?.error || 'Unknown error'}`);
+        }
+      } catch (error) {
+        console.error('Error importing paper to staging:', error);
+        alert(`Failed to import paper: ${error.message}`);
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    // Helper to format paper data
+    formatPaperForImport(paper) {
+      let formattedAuthors = [];
+      if (Array.isArray(paper.authors)) {
+        formattedAuthors = paper.authors.map(author => {
+          if (typeof author === 'object' && author !== null && author.name) return author;
+          if (typeof author === 'string') return { name: author };
+          return { name: 'Unknown Author' };
+        });
+      } else if (typeof paper.authors === 'string') {
+        formattedAuthors = [{ name: paper.authors }];
+      }
+
+      return {
+        title: paper.title || 'Unknown Title',
+        abstract: paper.abstract || '',
+        doi: paper.doi,
+        authors: formattedAuthors,
+        publication_date: paper.publication_date,
+        journal: paper.journal,
+        volume: paper.volume,
+        issue: paper.issue,
+        pages: paper.pages,
+        publisher: paper.publisher,
+        url: paper.url,
+        keywords: Array.isArray(paper.keywords) ? paper.keywords : [],
+        is_open_access: paper.is_open_access || false,
+        open_access_url: paper.open_access_url,
+        source: paper.source || 'Search Import'
+        // Status will be set by the calling method
+      };
     },
     
     addSelectedToProject() {

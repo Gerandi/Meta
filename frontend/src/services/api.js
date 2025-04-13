@@ -63,6 +63,15 @@ export const projectService = {
     return handleResponse(response);
   },
   
+  async importAndAddPaperToProject(projectId, paperData) {
+    const response = await fetch(API_ROUTES.PROJECTS.IMPORT_PAPER(projectId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(paperData),
+    });
+    return handleResponse(response);
+  },
+  
   async createProject(projectData) {
     const response = await fetch(API_ROUTES.PROJECTS.CREATE, {
       method: 'POST',
