@@ -33,14 +33,14 @@
         text="Dashboard" 
         :active="activeView === 'dashboard'" 
         @click="$emit('change-view', 'dashboard')" 
-        :disabled="false" <!-- Always enabled -->
+        :disabled="false" 
       />
       <SidebarItem 
         icon="Search" 
         text="Find Papers" 
         :active="activeView === 'search'" 
         @click="$emit('change-view', 'search')" 
-        :disabled="false" <!-- Always enabled -->
+        :disabled="false" 
       />
       <SidebarItem 
         icon="ClipboardList" 
@@ -68,7 +68,7 @@
         text="Projects" 
         :active="activeView === 'projects'" 
         @click="$emit('change-view', 'projects')"
-        :disabled="false" <!-- Always enabled -->
+        :disabled="false" 
       />
     </nav>
     
@@ -141,7 +141,11 @@ export default {
       }
     }
   },
+  created() {
+    console.log('[Sidebar.vue] Created hook executed.'); // Add log here
+  },
   mounted() {
+    console.log('[Sidebar.vue] Mounted.'); // Basic mount check
     console.log("Sidebar mounted - current user:", this.user?.email);
     console.log("Sidebar mounted - active project:", this.activeProject);
     console.log("Sidebar mounted - projects length:", this.projects?.length);
@@ -153,9 +157,26 @@ export default {
     this.fetchProjects();
   },
   methods: {
-    ...mapActions(useProjectStore, ['setActiveProject', 'clearActiveProject', 'fetchProjects']),
+    // Keep existing mapActions
+    ...mapActions(useProjectStore, ['setActiveProject', 'clearActiveProject']),
+    // Explicitly define fetchProjects to add logging/error handling
+    async fetchProjects() {
+      console.log('[Sidebar.vue] Attempting to fetch projects via store action...'); // Add log
+      const projectStore = useProjectStore(); // Get store instance
+      try {
+        await projectStore.fetchProjects(); // Call the store action
+        console.log('[Sidebar.vue] projectStore.fetchProjects action completed.'); // Log completion
+        // State (projects, isLoading, error) is managed by the store and mapped via computed properties
+      } catch (err) {
+        // Error handling is primarily in the store action, but catch here too for component-specific feedback if needed
+        console.error('[Sidebar.vue] Error calling fetchProjects action:', err);
+        // Optionally update a local error state if you add one to data()
+        // this.localError = err.message || 'Failed to load projects.';
+      }
+      // isLoading state is handled by the store
+    },
     ...mapActions(useAuthStore, ['logout']),
-    
+
     handleProjectChange() {
       if (this.selectedProjectId === 'manage') {
         return; // This is handled by the watcher

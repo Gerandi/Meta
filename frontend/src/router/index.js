@@ -47,21 +47,26 @@ const router = createRouter({
 // Navigation Guard
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore();
+  // --- ADD LOGGING ---
+  console.log(`[Router Guard] Navigating to: ${to.path}, IsAuthenticated: ${authStore.isAuthenticated}, AuthStatus: ${authStore.status}`);
+  // --- END LOGGING ---
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiresGuest = to.matched.some(record => record.meta.requiresGuest);
 
-  // Initialize auth state if not already done (e.g., on page refresh)
-  if (authStore.status === 'idle' && authStore.token) {
-    authStore.initializeAuth();
-  }
+  // --- ADD LOGGING ---
+  console.log(`[Router Guard] Requires Auth: ${requiresAuth}, Requires Guest: ${requiresGuest}`);
+  // --- END LOGGING ---
+
+  // REMOVED initializeAuth() call block
 
   if (requiresAuth && !authStore.isAuthenticated) {
-    console.log('Route requires auth, but user is not authenticated. Redirecting to login.');
+    console.log('[Router Guard] Auth required, not authenticated. Redirecting to Login.'); // Modified log
     next({ name: 'Login' });
   } else if (requiresGuest && authStore.isAuthenticated) {
-    console.log('Route requires guest, but user is authenticated. Redirecting to dashboard.');
-    next({ name: 'Dashboard' });
+    console.log('[Router Guard] Guest required, authenticated. Redirecting to Dashboard.'); // Modified log
+    next({ name: 'Dashboard' }); // Redirect authenticated users from guest pages
   } else {
+    console.log('[Router Guard] Proceeding with next().'); // Add log
     next(); // Proceed as normal
   }
 });

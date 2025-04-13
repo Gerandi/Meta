@@ -247,6 +247,7 @@ export default {
     };
   },
   mounted() {
+    console.log('[Dashboard.vue] Mounted.'); // Basic mount check
     // Fetch data from the API
     this.fetchProjects();
     this.fetchStats();
@@ -255,6 +256,7 @@ export default {
   },
   methods: {
     async fetchProjects() {
+      console.log('[Dashboard.vue] Attempting to fetch projects...'); // Add log
       try {
         // Use the projectService instead of direct fetch
         const projects = await projectService.listProjects();
@@ -281,12 +283,14 @@ export default {
         
         // Limit to the most recent 5 projects
         this.projects = this.projects.slice(0, 5);
+        console.log('[Dashboard.vue] Projects fetched successfully.'); // Add log
       } catch (err) {
-        console.error('Error fetching projects:', err);
+        console.error('[Dashboard.vue] Error fetching projects:', err); // Modify log
       }
     },
     
     async fetchStats() {
+      console.log('[Dashboard.vue] Attempting to fetch/calculate stats...'); // Add log
       try {
         // Use default values instead of trying to fetch from an endpoint that doesn't exist
         this.stats = {
@@ -296,8 +300,9 @@ export default {
         };
         
         // You can implement a proper stats endpoint later and replace this
+        console.log('[Dashboard.vue] Stats calculated successfully.'); // Add log
       } catch (err) {
-        console.error('Error calculating stats:', err);
+        console.error('[Dashboard.vue] Error calculating stats:', err); // Modify log
         this.stats = {
           papersCollected: 0,
           papersCoded: 0,
@@ -307,54 +312,30 @@ export default {
     },
     
     async fetchActivities() {
+      console.log('[Dashboard.vue] Attempting to fetch activities...'); // Modify log
       try {
-        // For now, we'll use some mock data for activities since the API endpoint
-        // for activity tracking doesn't seem to exist yet
-        this.activities = [
-          {
-            action: 'Added 3 papers',
-            project: this.projects.length > 0 ? this.projects[0].name : 'Meta Analysis Project',
-            time: '2 hours ago',
-            user: 'You'
-          },
-          {
-            action: 'Updated coding sheet',
-            project: this.projects.length > 1 ? this.projects[1].name : 'Research Project',
-            time: 'Yesterday',
-            user: 'You'
-          },
-          {
-            action: 'Exported results to CSV',
-            project: this.projects.length > 2 ? this.projects[2].name : 'Analysis Project',
-            time: '2 days ago',
-            user: 'You'
-          }
-        ];
+        // TODO: Implement API call when endpoint exists
+        // const activitiesData = await someApiService.fetchActivities();
+        // this.activities = activitiesData;
+        this.activities = []; // Set to empty array for now
+        console.log('[Dashboard.vue] Activities fetch placeholder executed (no API endpoint).'); // Modify log
       } catch (err) {
-        console.error('Error fetching activities:', err);
+        console.error('[Dashboard.vue] Error fetching activities:', err); // Keep error log
+        this.activities = []; // Ensure empty on error
       }
     },
     
     async fetchProjectProgress() {
+      console.log('[Dashboard.vue] Attempting to fetch project progress...'); // Modify log
       try {
-        // Calculate project progress based on papers and coding data
-        // This is a placeholder until there's a proper API endpoint for project progress
-        this.projectProgress = this.projects.slice(0, 3).map((project, index) => {
-          // Simulate different progress states
-          const progressMap = [
-            { searchComplete: true, screeningComplete: true, dataExtractionComplete: false, analysisComplete: false, percent: 50 },
-            { searchComplete: true, screeningComplete: true, dataExtractionComplete: true, analysisComplete: false, percent: 75 },
-            { searchComplete: true, screeningComplete: false, dataExtractionComplete: false, analysisComplete: false, percent: 25 }
-          ];
-          
-          return {
-            id: project.id,
-            title: project.name,
-            ...progressMap[index % progressMap.length]
-          };
-        });
+        // TODO: Implement API call when endpoint exists
+        // const progressData = await someApiService.fetchProjectProgress();
+        // this.projectProgress = progressData;
+        this.projectProgress = []; // Set to empty array for now
+        console.log('[Dashboard.vue] Project progress fetch placeholder executed (no API endpoint).'); // Modify log
       } catch (err) {
-        console.error('Error calculating project progress:', err);
+        console.error('[Dashboard.vue] Error fetching project progress:', err); // Keep error log
+        this.projectProgress = []; // Ensure empty on error
       }
     },
     

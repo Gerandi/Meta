@@ -88,39 +88,53 @@ export const useAuthStore = defineStore('auth', {
       if (!this.token) return;
       this.status = 'loading';
       try {
+        console.log('[Auth Store] Fetching user data...'); // Add log
         const userData = await apiCall(API_ROUTES.AUTH.GET_ME, { // Make sure GET_ME route exists
           headers: { Authorization: `Bearer ${this.token}` },
         });
         this.user = userData;
         this.status = 'success';
+        console.log('[Auth Store] User data fetched successfully:', this.user); // Add log
       } catch (error) {
-        console.error('Fetch user error:', error);
-        // If token is invalid, log out
-        if (error.message.includes('401') || error.message.includes('credentials')) {
-          this.logout();
+        console.error('[Auth Store] Fetch user error:', error.message); // Log specific message
+        // --- MODIFIED CATCH BLOCK ---
+        // Check for typical authentication error indicators
+        const errorMsg = error.message.toLowerCase();
+        if (errorMsg.includes('401') || errorMsg.includes('unauthorized') || errorMsg.includes('could not validate credentials') || errorMsg.includes('authentication failed')) {
+           console.warn("[Auth Store] Authentication failed while fetching user. Logging out.");
+           this.logout(); // Call logout to clear invalid state
         } else {
-          this.status = 'error';
-          this.error = 'Failed to fetch user data';
+           // Keep token but mark state as error for other issues
+           this.status = 'error';
+           this.error = 'Failed to fetch user data: ' + error.message;
+           this.user = null; // Ensure user data is cleared on any fetch error
         }
+        // --- END MODIFIED CATCH BLOCK ---
       }
     },
     logout() {
+      console.log('[Auth Store] Logging out user.'); // Add log
       this.token = null;
       this.user = null;
       this.status = 'idle';
       this.error = null;
       localStorage.removeItem('authToken');
-      // Potentially redirect to login page via router action
-      console.log('User logged out');
+      // In a real app, you'd likely use the router injected into the store or emit an event
+      // For now, the router guard will handle redirecting to login on next navigation attempt.
     },
     // Call this when the app loads
     async initializeAuth() {
+        console.log('[Auth Store] Initializing auth...'); // Add log
         const token = localStorage.getItem('authToken');
         if (token) {
+            console.log('[Auth Store] Found token in storage.'); // Add log
             this.token = token;
             await this.fetchUser(); // Validate token and get user info
         } else {
+            console.log('[Auth Store] No token found in storage.'); // Add log
             this.status = 'idle'; // Ensure status is idle if no token
+            this.token = null;
+            this.user = null;
         }
     },
   },

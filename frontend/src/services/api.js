@@ -5,13 +5,17 @@ import { useAuthStore } from '../stores/auth'; // Import auth store
 // Helper to get headers with auth token
 function getAuthHeaders() {
   const authStore = useAuthStore();
-  console.log('getAuthHeaders - Token:', authStore.token); // Added for debugging
+  // --- ADD LOGGING ---
+  console.log(`[API Service] getAuthHeaders called. IsAuthenticated: ${authStore.isAuthenticated}, Token present: ${!!authStore.token}`);
+  // --- END LOGGING ---
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   };
   if (authStore.isAuthenticated && authStore.token) {
     headers['Authorization'] = `Bearer ${authStore.token}`;
+  } else {
+    console.warn('[API Service] getAuthHeaders called, but user is not authenticated or token is missing.'); // Add warning
   }
   return headers;
 }
@@ -68,7 +72,9 @@ export const processingService = {
 };
 
 async function handleResponse(response) {
+  // Add logging for non-ok responses
   if (!response.ok) {
+    console.error(`[API Service] API call failed: ${response.url} - Status: ${response.status}`);
     let errorDetail = `HTTP error! status: ${response.status}`;
     if (response.status === 401) {
       // Unauthorized - likely invalid/expired token

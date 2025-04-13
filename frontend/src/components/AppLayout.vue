@@ -47,7 +47,7 @@
           @back-to-project="handleBackToProject"
           @coding-saved="refreshResultsTable"
         >
-           <component :is="Component" />
+           <component :is="Component" :active-project="activeProject" /> <!-- Bind activeProject -->
         </router-view>
       </div>
     </div>
@@ -272,6 +272,9 @@ export default {
     handleClearActiveProject() {
       this.clearActiveProject();
     }
+  },
+  created() {
+    console.log('[AppLayout.vue] Created hook executed.'); // Add log here
   },
   mounted() {
     console.log("AppLayout mounted - current user:", this.currentUser?.email);
